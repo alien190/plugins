@@ -190,37 +190,6 @@ public class ResolutionFeatureTest {
             1, ResolutionPreset.max));
   }
 
-  @Config(minSdk = 31)
-  @Test
-  public void getBestAvailableCamcorderProfileForResolutionPreset_shouldFallThrough() {
-    mockedStaticProfile
-        .when(() -> CamcorderProfile.hasProfile(1, CamcorderProfile.QUALITY_HIGH))
-        .thenReturn(false);
-    mockedStaticProfile
-        .when(() -> CamcorderProfile.hasProfile(1, CamcorderProfile.QUALITY_2160P))
-        .thenReturn(false);
-    mockedStaticProfile
-        .when(() -> CamcorderProfile.hasProfile(1, CamcorderProfile.QUALITY_1080P))
-        .thenReturn(false);
-    mockedStaticProfile
-        .when(() -> CamcorderProfile.hasProfile(1, CamcorderProfile.QUALITY_720P))
-        .thenReturn(false);
-    mockedStaticProfile
-        .when(() -> CamcorderProfile.hasProfile(1, CamcorderProfile.QUALITY_480P))
-        .thenReturn(false);
-    mockedStaticProfile
-        .when(() -> CamcorderProfile.hasProfile(1, CamcorderProfile.QUALITY_QVGA))
-        .thenReturn(false);
-    mockedStaticProfile
-        .when(() -> CamcorderProfile.hasProfile(1, CamcorderProfile.QUALITY_LOW))
-        .thenReturn(true);
-
-    assertEquals(
-        mockProfileLow,
-        ResolutionFeature.getBestAvailableCamcorderProfileForResolutionPreset(
-            1, ResolutionPreset.max));
-  }
-
   @Config(maxSdk = 30)
   @SuppressWarnings("deprecation")
   @Test
