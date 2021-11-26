@@ -242,17 +242,6 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
         }
 
         if (jpegClosestSize != null && yuvClosestSize != null) {
-            if (jpegClosestSize.getWidth() == ResolutionPreset.PREFFERED_43FORMAT_WIDTH
-                    && jpegClosestSize.getHeight() == ResolutionPreset.PREFFERED_43FORMAT_HEIGHT) {
-                captureFormat = ImageFormat.JPEG;
-                final Size size = new Size(ResolutionPreset.PREFFERED_43FORMAT_WIDTH,
-                        ResolutionPreset.PREFFERED_43FORMAT_HEIGHT);
-                previewSize = size;
-                captureSize = size;
-                Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
-                return;
-            }
-
             if (yuvClosestSize.getWidth() == ResolutionPreset.PREFFERED_43FORMAT_WIDTH
                     && yuvClosestSize.getHeight() == ResolutionPreset.PREFFERED_43FORMAT_HEIGHT) {
                 captureFormat = ImageFormat.YUV_420_888;
@@ -264,22 +253,31 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
                 return;
             }
 
-            if (jpegClosestSize.getWidth() <= yuvClosestSize.getWidth()
-                    && jpegClosestSize.getHeight() <= yuvClosestSize.getHeight()) {
+            if (jpegClosestSize.getWidth() == ResolutionPreset.PREFFERED_43FORMAT_WIDTH
+                    && jpegClosestSize.getHeight() == ResolutionPreset.PREFFERED_43FORMAT_HEIGHT) {
                 captureFormat = ImageFormat.JPEG;
-                final Size size = new Size(jpegClosestSize.getWidth(), jpegClosestSize.getHeight());
+                final Size size = new Size(ResolutionPreset.PREFFERED_43FORMAT_WIDTH,
+                        ResolutionPreset.PREFFERED_43FORMAT_HEIGHT);
                 previewSize = size;
                 captureSize = size;
                 Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
                 return;
             }
 
-            captureFormat = ImageFormat.YUV_420_888;
-            final Size size = new Size(yuvClosestSize.getWidth(), yuvClosestSize.getHeight());
+            if (yuvClosestSize.getWidth() <= jpegClosestSize.getWidth()
+                    && yuvClosestSize.getHeight() <= jpegClosestSize.getHeight()) {
+                captureFormat = ImageFormat.YUV_420_888;
+                final Size size = new Size(yuvClosestSize.getWidth(), yuvClosestSize.getHeight());
+                previewSize = size;
+                captureSize = size;
+                Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
+                return;
+            }
+            captureFormat = ImageFormat.JPEG;
+            final Size size = new Size(jpegClosestSize.getWidth(), jpegClosestSize.getHeight());
             previewSize = size;
             captureSize = size;
             Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
-
         } else if (jpegClosestSize != null) {
             captureFormat = ImageFormat.JPEG;
             final Size size = new Size(jpegClosestSize.getWidth(), jpegClosestSize.getHeight());
