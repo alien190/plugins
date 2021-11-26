@@ -138,10 +138,10 @@ public class DeviceOrientationManager implements SensorEventListener {
 
     private boolean isOrientationChangeAllowed() {
         updateOrientationAngles();
-        return orientationAngles[1] >= 0.524 ||
-                orientationAngles[1] <= -0.524 ||
-                orientationAngles[2] >= 0.524 ||
-                orientationAngles[2] <= -0.524;
+        return orientationAngles[1] >= 0.7 ||
+                orientationAngles[1] <= -0.7 ||
+                orientationAngles[2] >= 0.7 ||
+                orientationAngles[2] <= -0.7;
     }
 
     private void startUIListener() {
