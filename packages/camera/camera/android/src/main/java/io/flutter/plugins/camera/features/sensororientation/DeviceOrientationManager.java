@@ -10,6 +10,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Configuration;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.util.Log;
 import android.view.Display;
@@ -20,6 +23,8 @@ import android.view.WindowManager;
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
+import java.util.Arrays;
+
 import io.flutter.embedding.engine.systemchannels.PlatformChannel;
 import io.flutter.embedding.engine.systemchannels.PlatformChannel.DeviceOrientation;
 import io.flutter.plugins.camera.DartMessenger;
@@ -27,7 +32,7 @@ import io.flutter.plugins.camera.DartMessenger;
 /**
  * Support class to help to determine the media orientation based on the orientation of the device.
  */
-public class DeviceOrientationManager {
+public class DeviceOrientationManager implements SensorEventListener {
 
     private static final IntentFilter orientationIntentFilter =
             new IntentFilter(Intent.ACTION_CONFIGURATION_CHANGED);
@@ -41,6 +46,14 @@ public class DeviceOrientationManager {
     private PlatformChannel.DeviceOrientation lastOrientation;
     private BroadcastReceiver broadcastReceiver;
     private OrientationEventListener orientationEventListener;
+    private final SensorManager sensorManager;
+
+    private final float[] accelerometerReading = new float[3];
+    private final float[] magnetometerReading = new float[3];
+
+    private final float[] rotationMatrix = new float[9];
+    private final float[] orientationAngles = new float[3];
+
 
     /**
      * Factory method to create a device orientation manager.
@@ -62,6 +75,7 @@ public class DeviceOrientationManager {
         this.messenger = messenger;
         this.isFrontFacing = isFrontFacing;
         this.sensorOrientation = sensorOrientation;
+        this.sensorManager = (SensorManager) activity.getSystemService(Context.SENSOR_SERVICE);
     }
 
     public void start() {
@@ -81,7 +95,7 @@ public class DeviceOrientationManager {
                     @Override
                     public void onOrientationChanged(int angle) {
                         PlatformChannel.DeviceOrientation newOrientation = calculateSensorOrientation(angle);
-                        if (!newOrientation.equals(lastOrientation)) {
+                        if (!newOrientation.equals(lastOrientation) && isOrientationChangeAllowed()) {
                             Log.d(TAG, "sensor orientation set:" + newOrientation.toString());
                             lastOrientation = newOrientation;
                             messenger.sendDeviceOrientationChangeEvent(newOrientation);
@@ -91,6 +105,25 @@ public class DeviceOrientationManager {
         if (orientationEventListener.canDetectOrientation()) {
             orientationEventListener.enable();
         }
+
+        Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        if (accelerometer != null) {
+            sensorManager.registerListener(this, accelerometer,
+                    SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
+        }
+        Sensor magneticField = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        if (magneticField != null) {
+            sensorManager.registerListener(this, magneticField,
+                    SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
+        }
+    }
+
+    private boolean isOrientationChangeAllowed() {
+        updateOrientationAngles();
+        return orientationAngles[1] >= 0.524 ||
+                orientationAngles[1] <= -0.524 ||
+                orientationAngles[2] >= 0.524 ||
+                orientationAngles[2] <= -0.524;
     }
 
     private void startUIListener() {
@@ -100,7 +133,7 @@ public class DeviceOrientationManager {
                     @Override
                     public void onReceive(Context context, Intent intent) {
                         PlatformChannel.DeviceOrientation orientation = getUIOrientation();
-                        if (!orientation.equals(lastOrientation)) {
+                        if (!orientation.equals(lastOrientation) && isOrientationChangeAllowed()) {
                             Log.d(TAG, "UI orientation set:" + orientation.toString());
                             lastOrientation = orientation;
                             messenger.sendDeviceOrientationChangeEvent(orientation);
@@ -115,6 +148,7 @@ public class DeviceOrientationManager {
         if (orientationEventListener == null) return;
         orientationEventListener.disable();
         orientationEventListener = null;
+        sensorManager.unregisterListener(this);
     }
 
     private void stopUIListener() {
@@ -400,4 +434,35 @@ public class DeviceOrientationManager {
     Display getDisplay() {
         return ((WindowManager) activity.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
     }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+            System.arraycopy(event.values, 0, accelerometerReading,
+                    0, accelerometerReading.length);
+        } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+            System.arraycopy(event.values, 0, magnetometerReading,
+                    0, magnetometerReading.length);
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int i) {
+
+    }
+
+    private void updateOrientationAngles() {
+        // Update rotation matrix, which is needed to update orientation angles.
+        SensorManager.getRotationMatrix(rotationMatrix, null,
+                accelerometerReading, magnetometerReading);
+
+        // "rotationMatrix" now has up-to-date information.
+
+        SensorManager.getOrientation(rotationMatrix, orientationAngles);
+
+        // "orientationAngles" now has up-to-date information.
+
+        Log.w(TAG, "Orientation angles:" + Arrays.toString(orientationAngles));
+    }
+
 }
