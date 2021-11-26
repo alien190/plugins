@@ -85,6 +85,7 @@ class Camera
         implements CameraCaptureCallback.CameraCaptureStateListener,
         ImageReader.OnImageAvailableListener {
     private static final String TAG = "Camera";
+    private static final String TAG_CAPTURE = "CameraCapture";
 
     private static final HashMap<String, Integer> supportedImageFormats;
 
@@ -480,6 +481,7 @@ class Camera
     }
 
     public void takePicture(@NonNull final Result result) {
+        Log.w(TAG_CAPTURE, "takePicture() invoked");
         // Only take one picture at a time.
         if (cameraCaptureCallback.getCameraState() != CameraState.STATE_PREVIEW) {
             result.error("captureAlreadyActive", "Picture is currently already being captured", null);
@@ -578,11 +580,11 @@ class Camera
         final PlatformChannel.DeviceOrientation lockedOrientation =
                 ((SensorOrientationFeature) cameraFeatures.getSensorOrientation())
                         .getLockedCaptureOrientation();
-        stillBuilder.set(
-                CaptureRequest.JPEG_ORIENTATION,
-                lockedOrientation == null
-                        ? getDeviceOrientationManager().getPhotoOrientation()
-                        : getDeviceOrientationManager().getPhotoOrientation(lockedOrientation));
+//        stillBuilder.set(
+//                CaptureRequest.JPEG_ORIENTATION,
+//                lockedOrientation == null
+//                        ? getDeviceOrientationManager().getPhotoOrientation()
+//                        : getDeviceOrientationManager().getPhotoOrientation(lockedOrientation));
 
         CameraCaptureSession.CaptureCallback captureCallback =
                 new CameraCaptureSession.CaptureCallback() {
@@ -1080,6 +1082,7 @@ class Camera
     @Override
     public void onImageAvailable(ImageReader reader) {
         Log.i(TAG, "onImageAvailable");
+        Log.w(TAG_CAPTURE, "onImageAvailable");
 
         backgroundHandler.post(
                 new ImageSaver(
@@ -1092,11 +1095,13 @@ class Camera
                             @Override
                             public void onComplete(String absolutePath) {
                                 dartMessenger.finish(flutterResult, absolutePath);
+                                Log.w(TAG_CAPTURE, "ImageSaver.onComplete()");
                             }
 
                             @Override
                             public void onError(String errorCode, String errorMessage) {
                                 dartMessenger.error(flutterResult, errorCode, errorMessage, null);
+                                Log.w(TAG_CAPTURE, "ImageSaver.onError()");
                             }
                         }));
         cameraCaptureCallback.setCameraState(CameraState.STATE_PREVIEW);

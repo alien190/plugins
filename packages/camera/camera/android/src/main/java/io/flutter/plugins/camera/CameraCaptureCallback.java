@@ -132,13 +132,13 @@ class CameraCaptureCallback extends CaptureCallback {
         {
           // CONTROL_AE_STATE can be null on some devices
           if (aeState == null || aeState != CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
+            Log.w(TAG, "STATE_WAITING_PRECAPTURE_DONE -> onConverged");
             cameraStateListener.onConverged();
           } else if (captureTimeouts.getPreCaptureMetering().getIsExpired()) {
             Log.w(
                 TAG, "Metering timeout waiting for pre-capture to finish, moving on with capture");
             cameraStateListener.onConverged();
           }
-
           break;
         }
     }
@@ -147,8 +147,10 @@ class CameraCaptureCallback extends CaptureCallback {
   private void handleWaitingFocusState(Integer aeState) {
     // CONTROL_AE_STATE can be null on some devices
     if (aeState == null || aeState == CaptureRequest.CONTROL_AE_STATE_CONVERGED) {
+      Log.w(TAG, "handleWaitingFocusState -> onConverged");
       cameraStateListener.onConverged();
     } else {
+      Log.w(TAG, "handleWaitingFocusState -> onPrecapture");
       cameraStateListener.onPrecapture();
     }
   }

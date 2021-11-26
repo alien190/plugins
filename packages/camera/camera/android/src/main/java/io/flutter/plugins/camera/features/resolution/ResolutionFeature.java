@@ -249,6 +249,7 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
                         ResolutionPreset.PREFFERED_43FORMAT_HEIGHT);
                 previewSize = size;
                 captureSize = size;
+                Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
                 return;
             }
 
@@ -259,6 +260,7 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
                         ResolutionPreset.PREFFERED_43FORMAT_HEIGHT);
                 previewSize = size;
                 captureSize = size;
+                Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
                 return;
             }
 
@@ -268,6 +270,7 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
                 final Size size = new Size(jpegClosestSize.getWidth(), jpegClosestSize.getHeight());
                 previewSize = size;
                 captureSize = size;
+                Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
                 return;
             }
 
@@ -275,24 +278,28 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
             final Size size = new Size(yuvClosestSize.getWidth(), yuvClosestSize.getHeight());
             previewSize = size;
             captureSize = size;
+            Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
 
         } else if (jpegClosestSize != null) {
             captureFormat = ImageFormat.JPEG;
             final Size size = new Size(jpegClosestSize.getWidth(), jpegClosestSize.getHeight());
             previewSize = size;
             captureSize = size;
+            Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
 
         } else if (yuvClosestSize != null) {
             captureFormat = ImageFormat.YUV_420_888;
             final Size size = new Size(yuvClosestSize.getWidth(), yuvClosestSize.getHeight());
             previewSize = size;
             captureSize = size;
+            Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
         }
     }
 
     private Size getClosest43Resolution(StreamConfigurationMap streamConfigurationMap, int format)
             throws IllegalStateException {
         final Size[] sizes = streamConfigurationMap.getOutputSizes(format);
+        Log.w(TAG, "Available sizes, format: " + format + ", sizes: " + Arrays.toString(sizes));
         Arrays.sort(sizes, (o1, o2) ->
                 {
                     final int widthDiff = o1.getWidth() - o2.getWidth();
@@ -303,12 +310,26 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
                 }
         );
         for (Size size : sizes) {
-            final float aspectRatio = ((float) size.getWidth()) / size.getHeight();
-            if (aspectRatio >= 1.3 && aspectRatio <= 1.4 &&
-                    size.getWidth() >= 1600 && size.getHeight() >= 1200) {
+            int longSide;
+            int shortSide;
+            if (size.getWidth() > size.getHeight()) {
+                longSide = size.getWidth();
+                shortSide = size.getHeight();
+            } else {
+                longSide = size.getHeight();
+                shortSide = size.getWidth();
+            }
+            final float aspectRatio = ((float) longSide) / shortSide;
+
+            if (aspectRatio >= ResolutionPreset.PREFFERED_43FORMAT_LOW_ASPECT_RATIO &&
+                    aspectRatio <= ResolutionPreset.PREFFERED_43FORMAT_HIGH_ASPECT_RATIO &&
+                    longSide >= ResolutionPreset.PREFFERED_43FORMAT_WIDTH &&
+                    shortSide >= ResolutionPreset.PREFFERED_43FORMAT_HEIGHT) {
+                Log.w(TAG, "Selected size: " + size + ", format: " + format);
                 return size;
             }
         }
+        Log.w(TAG, "Size selection error: No appropriate size");
         throw new IllegalStateException("No sizes");
     }
 }

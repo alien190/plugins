@@ -8,6 +8,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.media.Image;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -23,6 +24,8 @@ import java.nio.ByteBuffer;
  * Saves a JPEG {@link Image} into the specified {@link File}.
  */
 public class ImageSaver implements Runnable {
+
+    private static final String TAG = "ImageSaver";
 
     /**
      * The JPEG image
@@ -65,9 +68,11 @@ public class ImageSaver implements Runnable {
 
     @Override
     public void run() {
+        Log.w(TAG, "run()");
         FileOutputStream output = null;
         try {
             if (targetWidth == null && targetAngel == null) {
+                Log.w(TAG, "targetWidth == null && targetAngel == null");
                 ByteBuffer buffer = image.getPlanes()[0].getBuffer();
                 byte[] bytes = new byte[buffer.remaining()];
                 buffer.get(bytes);
@@ -75,18 +80,29 @@ public class ImageSaver implements Runnable {
                 output.write(bytes);
 
                 callback.onComplete(file.getAbsolutePath());
+                Log.w(TAG, "onComplete()");
                 return;
             }
 
 
             final byte[] imageBytes = CameraUtils.imageToByteArray(image);
             final Bitmap srcBitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+            Log.w(TAG, "srcBitmap was created. Width:" + srcBitmap.getWidth() + ", height:" + srcBitmap.getHeight());
 
             final Matrix dstMatrix = new Matrix();
-            final float scaleFactor = targetWidth != null ? ((float) targetWidth / srcBitmap.getWidth()) : 1;
+            float scaleFactor = 1;
+            if (targetWidth != null) {
+                if (srcBitmap.getWidth() > srcBitmap.getHeight()) {
+                    scaleFactor = ((float) targetWidth / srcBitmap.getWidth());
+                } else {
+                    scaleFactor = ((float) targetWidth / srcBitmap.getHeight());
+                }
+            }
+            Log.w(TAG, "scaleFactor:" + scaleFactor);
             dstMatrix.postScale(scaleFactor, scaleFactor);
 
             if (targetAngel != null) {
+                Log.w(TAG, "targetAngel:" + targetAngel);
                 dstMatrix.postRotate(targetAngel);
             }
 
@@ -99,17 +115,21 @@ public class ImageSaver implements Runnable {
                     dstMatrix,
                     true
             );
+            Log.w(TAG, "dstBitmap was created (rotation + scale). Width:" + dstBitmap.getWidth() + ", height:" + dstBitmap.getHeight());
 
             output = FileOutputStreamFactory.create(file);
             dstBitmap.compress(Bitmap.CompressFormat.JPEG, 100, output);
 
             callback.onComplete(file.getAbsolutePath());
+            Log.w(TAG, "onComplete()");
             srcBitmap.recycle();
             dstBitmap.recycle();
         } catch (IOException e) {
             callback.onError("IOError", "Failed saving image: " + e.toString());
+            Log.w(TAG, "Error: " + e.toString());
         } catch (Exception e) {
             callback.onError("Unknown Error", "Failed saving image: " + e.toString());
+            Log.w(TAG, "Error: " + e.toString());
         } finally {
             image.close();
             if (null != output) {

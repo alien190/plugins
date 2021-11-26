@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.hardware.SensorManager;
+import android.util.Log;
 import android.view.Display;
 import android.view.OrientationEventListener;
 import android.view.Surface;
@@ -30,6 +31,8 @@ public class DeviceOrientationManager {
 
     private static final IntentFilter orientationIntentFilter =
             new IntentFilter(Intent.ACTION_CONFIGURATION_CHANGED);
+
+    private static final String TAG = "DeviceOrientationMng";
 
     private final Activity activity;
     private final DartMessenger messenger;
@@ -79,6 +82,7 @@ public class DeviceOrientationManager {
                     public void onOrientationChanged(int angle) {
                         PlatformChannel.DeviceOrientation newOrientation = calculateSensorOrientation(angle);
                         if (!newOrientation.equals(lastOrientation)) {
+                            Log.d(TAG, "sensor orientation set:" + newOrientation.toString());
                             lastOrientation = newOrientation;
                             messenger.sendDeviceOrientationChangeEvent(newOrientation);
                         }
@@ -97,6 +101,7 @@ public class DeviceOrientationManager {
                     public void onReceive(Context context, Intent intent) {
                         PlatformChannel.DeviceOrientation orientation = getUIOrientation();
                         if (!orientation.equals(lastOrientation)) {
+                            Log.d(TAG, "UI orientation set:" + orientation.toString());
                             lastOrientation = orientation;
                             messenger.sendDeviceOrientationChangeEvent(orientation);
                         }
