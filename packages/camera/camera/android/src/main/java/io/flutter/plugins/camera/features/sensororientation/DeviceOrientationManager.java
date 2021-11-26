@@ -76,6 +76,9 @@ public class DeviceOrientationManager implements SensorEventListener {
         this.isFrontFacing = isFrontFacing;
         this.sensorOrientation = sensorOrientation;
         this.sensorManager = (SensorManager) activity.getSystemService(Context.SENSOR_SERVICE);
+        orientationAngles[0] = 0;
+        orientationAngles[1] = 1.54f;
+        orientationAngles[2] = 1.54f;
     }
 
     public void start() {
@@ -108,13 +111,19 @@ public class DeviceOrientationManager implements SensorEventListener {
 
         Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         if (accelerometer != null) {
+            Log.w(TAG, "accelerometer was initialized");
             sensorManager.registerListener(this, accelerometer,
                     SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
+        } else {
+            Log.w(TAG, "accelerometer was NOT initialized");
         }
         Sensor magneticField = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
         if (magneticField != null) {
+            Log.w(TAG, "magnetic was initialized");
             sensorManager.registerListener(this, magneticField,
                     SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
+        } else {
+            Log.w(TAG, "magnetic was NOT initialized");
         }
     }
 
