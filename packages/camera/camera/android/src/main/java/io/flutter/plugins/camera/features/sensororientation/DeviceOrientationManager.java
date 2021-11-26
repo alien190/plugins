@@ -54,6 +54,9 @@ public class DeviceOrientationManager implements SensorEventListener {
     private final float[] rotationMatrix = new float[9];
     private final float[] orientationAngles = new float[3];
 
+    private boolean isAccelerationSensorPresent;
+    private boolean isMagneticSensorPresent;
+
 
     /**
      * Factory method to create a device orientation manager.
@@ -79,6 +82,8 @@ public class DeviceOrientationManager implements SensorEventListener {
         orientationAngles[0] = 0;
         orientationAngles[1] = 1.54f;
         orientationAngles[2] = 1.54f;
+        isAccelerationSensorPresent = false;
+        isMagneticSensorPresent = false;
     }
 
     public void start() {
@@ -114,16 +119,20 @@ public class DeviceOrientationManager implements SensorEventListener {
             Log.w(TAG, "accelerometer was initialized");
             sensorManager.registerListener(this, accelerometer,
                     SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
+            isAccelerationSensorPresent = true;
         } else {
             Log.w(TAG, "accelerometer was NOT initialized");
+            isAccelerationSensorPresent = false;
         }
         Sensor magneticField = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
         if (magneticField != null) {
             Log.w(TAG, "magnetic was initialized");
             sensorManager.registerListener(this, magneticField,
                     SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
+            isMagneticSensorPresent = true;
         } else {
             Log.w(TAG, "magnetic was NOT initialized");
+            isMagneticSensorPresent = false;
         }
     }
 
@@ -461,17 +470,15 @@ public class DeviceOrientationManager implements SensorEventListener {
     }
 
     private void updateOrientationAngles() {
-        // Update rotation matrix, which is needed to update orientation angles.
-        SensorManager.getRotationMatrix(rotationMatrix, null,
-                accelerometerReading, magnetometerReading);
-
-        // "rotationMatrix" now has up-to-date information.
-
-        SensorManager.getOrientation(rotationMatrix, orientationAngles);
-
-        // "orientationAngles" now has up-to-date information.
-
+        if (isAccelerationSensorPresent && isMagneticSensorPresent) {
+            SensorManager.getRotationMatrix(rotationMatrix, null,
+                    accelerometerReading, magnetometerReading);
+            SensorManager.getOrientation(rotationMatrix, orientationAngles);
+        } else {
+            orientationAngles[0] = 0;
+            orientationAngles[1] = 1.54f;
+            orientationAngles[2] = 1.54f;
+        }
         Log.w(TAG, "Orientation angles:" + Arrays.toString(orientationAngles));
     }
-
 }
