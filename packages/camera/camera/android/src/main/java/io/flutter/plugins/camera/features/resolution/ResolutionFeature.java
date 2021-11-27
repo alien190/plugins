@@ -165,6 +165,10 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
                 if (CamcorderProfile.hasProfile(cameraId, CamcorderProfile.QUALITY_1080P)) {
                     return CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_1080P);
                 }
+            case custom43:
+                if (CamcorderProfile.hasProfile(cameraId, CamcorderProfile.QUALITY_1080P)) {
+                    return CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_1080P);
+                }    
             case high:
                 if (CamcorderProfile.hasProfile(cameraId, CamcorderProfile.QUALITY_720P)) {
                     return CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_720P);
