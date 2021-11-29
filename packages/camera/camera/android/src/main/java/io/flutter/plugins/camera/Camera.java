@@ -505,11 +505,11 @@ class Camera
 
         final AutoFocusFeature autoFocusFeature = cameraFeatures.getAutoFocus();
         final boolean isAutoFocusSupported = autoFocusFeature.checkIsSupported();
-        if (isAutoFocusSupported && autoFocusFeature.getValue() == FocusMode.auto) {
-            runPictureAutoFocus();
-        } else {
+        //if (isAutoFocusSupported && autoFocusFeature.getValue() == FocusMode.auto) {
+        //    runPictureAutoFocus();
+        //} else {
             runPrecaptureSequence();
-        }
+        //}
     }
 
     /**
