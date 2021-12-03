@@ -11,10 +11,59 @@
 #import <libkern/OSAtomic.h>
 #import <uuid/uuid.h>
 #import "FLTThreadSafeFlutterResult.h"
+#import <Foundation/Foundation.h>
+#import <GLKit/GLKit.h>
+
+
+int const PREFFERED_43FORMAT_WIDTH = 1600;
+int const PREFFERED_43FORMAT_HEIGHT = 1200;
+float const PREFFERED_43FORMAT_LOW_ASPECT_RATIO = 1.3;
+float const PREFFERED_43FORMAT_HIGH_ASPECT_RATIO = 1.4;
+
+// Mirrors ResolutionPreset in camera.dart
+typedef enum {
+    veryLow,
+    low,
+    medium,
+    high,
+    veryHigh,
+    ultraHigh,
+    max,
+    custom43,
+} ResolutionPreset;
+
+@interface NSCameraResolution: NSObject
+@property(readonly, nonatomic) int width;
+@property(readonly, nonatomic) int heigh;
+@property(readonly, nonatomic) AVCaptureDeviceFormat* format;
+
+- (id)initWithWidth: (int) w andHeight: (int) h andFormat: (AVCaptureDeviceFormat*) f;
+- (NSString*) description;
+@end
+
+@implementation NSCameraResolution
+- (id)initWithWidth: (int) w andHeight: (int) h andFormat: (AVCaptureDeviceFormat*) f
+{
+    self = [super init];
+    if(self) {
+        _width = w;
+        _heigh = h;
+        _format = f;
+    }
+    return  self;
+}
+
+-(NSString *)description {
+    return [NSString stringWithFormat:@"NSCameraResolution: width:%d height:%d format:%@", _width, _heigh, _format];
+}
+@end
 
 @interface FLTSavePhotoDelegate : NSObject <AVCapturePhotoCaptureDelegate>
 @property(readonly, nonatomic) NSString *path;
 @property(readonly, nonatomic) FLTThreadSafeFlutterResult *result;
+@property(readonly, nonatomic) UIDeviceOrientation deviceOrientation;
+@property(readonly, nonatomic) UIDeviceOrientation lockedOrientation;
+@property(readonly, nonatomic) ResolutionPreset resolutionPreset;
 @end
 
 @interface FLTImageStreamHandler : NSObject <FlutterStreamHandler>
@@ -24,283 +73,346 @@
 @implementation FLTImageStreamHandler
 
 - (FlutterError *_Nullable)onCancelWithArguments:(id _Nullable)arguments {
-  _eventSink = nil;
-  return nil;
+    _eventSink = nil;
+    return nil;
 }
 
 - (FlutterError *_Nullable)onListenWithArguments:(id _Nullable)arguments
                                        eventSink:(nonnull FlutterEventSink)events {
-  _eventSink = events;
-  return nil;
+    _eventSink = events;
+    return nil;
 }
 @end
 
 @implementation FLTSavePhotoDelegate {
-  /// Used to keep the delegate alive until didFinishProcessingPhotoSampleBuffer.
-  FLTSavePhotoDelegate *selfReference;
+    /// Used to keep the delegate alive until didFinishProcessingPhotoSampleBuffer.
+    FLTSavePhotoDelegate *selfReference;
 }
 
-- initWithPath:(NSString *)path result:(FLTThreadSafeFlutterResult *)result {
-  self = [super init];
-  NSAssert(self, @"super init cannot be nil");
-  _path = path;
-  selfReference = self;
-  _result = result;
-  return self;
-}
-
-- (void)captureOutput:(AVCapturePhotoOutput *)output
-    didFinishProcessingPhotoSampleBuffer:(CMSampleBufferRef)photoSampleBuffer
-                previewPhotoSampleBuffer:(CMSampleBufferRef)previewPhotoSampleBuffer
-                        resolvedSettings:(AVCaptureResolvedPhotoSettings *)resolvedSettings
-                         bracketSettings:(AVCaptureBracketedStillImageSettings *)bracketSettings
-                                   error:(NSError *)error API_AVAILABLE(ios(10)) {
-  selfReference = nil;
-  if (error) {
-    [_result sendError:error];
-    return;
-  }
-
-  NSData *data = [AVCapturePhotoOutput
-      JPEGPhotoDataRepresentationForJPEGSampleBuffer:photoSampleBuffer
-                            previewPhotoSampleBuffer:previewPhotoSampleBuffer];
-
-  // TODO(sigurdm): Consider writing file asynchronously.
-  bool success = [data writeToFile:_path atomically:YES];
-
-  if (!success) {
-    [_result sendErrorWithCode:@"IOError" message:@"Unable to write file" details:nil];
-    return;
-  }
-  [_result sendSuccessWithData:_path];
+- initWithPath:(NSString *) path result:(FLTThreadSafeFlutterResult *)result
+                      deviceOrientation:(UIDeviceOrientation) deviceOrientation
+                      lockedOrientation:(UIDeviceOrientation) lockedOrientation
+                       resolutionPreset:(ResolutionPreset)resolutionPreset{
+    self = [super init];
+    NSAssert(self, @"super init cannot be nil");
+    _path = path;
+    selfReference = self;
+    _result = result;
+    _deviceOrientation = deviceOrientation;
+    _lockedOrientation = lockedOrientation;
+    _resolutionPreset = resolutionPreset;
+    return self;
 }
 
 - (void)captureOutput:(AVCapturePhotoOutput *)output
-    didFinishProcessingPhoto:(AVCapturePhoto *)photo
-                       error:(NSError *)error API_AVAILABLE(ios(11.0)) {
-  selfReference = nil;
-  if (error) {
-    [_result sendError:error];
-    return;
-  }
-
-  NSData *photoData = [photo fileDataRepresentation];
-
-  bool success = [photoData writeToFile:_path atomically:YES];
-  if (!success) {
-    [_result sendErrorWithCode:@"IOError" message:@"Unable to write file" details:nil];
-    return;
-  }
-  [_result sendSuccessWithData:_path];
+didFinishProcessingPhotoSampleBuffer:(CMSampleBufferRef)photoSampleBuffer
+previewPhotoSampleBuffer:(CMSampleBufferRef)previewPhotoSampleBuffer
+     resolvedSettings:(AVCaptureResolvedPhotoSettings *)resolvedSettings
+      bracketSettings:(AVCaptureBracketedStillImageSettings *)bracketSettings
+                error:(NSError *)error API_AVAILABLE(ios(10)) {
+    selfReference = nil;
+    if (error) {
+        [_result sendError:error];
+        return;
+    }
+    
+    NSData *data = [AVCapturePhotoOutput
+                    JPEGPhotoDataRepresentationForJPEGSampleBuffer:photoSampleBuffer
+                    previewPhotoSampleBuffer:previewPhotoSampleBuffer];
+    
+    if(_resolutionPreset == custom43) {
+        [self processPhotoData:data];
+    } else {
+        bool success = [data writeToFile:_path atomically:YES];
+        if (!success) {
+          [_result sendErrorWithCode:@"IOError" message:@"Unable to write file" details:nil];
+          return;
+        }
+        [_result sendSuccessWithData:_path];
+    }
 }
+
+- (void)captureOutput:(AVCapturePhotoOutput *)output
+didFinishProcessingPhoto:(AVCapturePhoto *)photo
+                error:(NSError *)error API_AVAILABLE(ios(11.0)) {
+    selfReference = nil;
+    if (error) {
+        [_result sendError:error];
+        return;
+    }
+    
+    NSData *photoData = [photo fileDataRepresentation];
+
+    if ( _resolutionPreset == custom43 ) {
+        [self processPhotoData:photoData];
+    } else {
+        bool success = [photoData writeToFile:_path atomically:YES];
+        if (!success) {
+          [_result sendErrorWithCode:@"IOError" message:@"Unable to write file" details:nil];
+          return;
+        }
+        [_result sendSuccessWithData:_path];
+    }
+}
+
+-(void) processPhotoData: (NSData*) photoData {
+    CGFloat rotation = _lockedOrientation == UIDeviceOrientationUnknown ? 0
+                                             : [self getRotationAngleInRadiansForOrintation:_deviceOrientation] -
+                                               [self getRotationAngleInRadiansForOrintation:_lockedOrientation];
+    UIImage* image = [[UIImage alloc] initWithData:photoData];
+    // Calculate Destination Size
+    CGAffineTransform rotationTransform = CGAffineTransformMakeRotation(rotation);
+    CGFloat ratio = 1;
+    if(image.size.width > image.size.height) {
+        ratio = ((CGFloat)PREFFERED_43FORMAT_WIDTH) / image.size.width;
+    } else {
+        ratio = ((CGFloat)PREFFERED_43FORMAT_WIDTH) / image.size.height;
+    }
+
+    CGAffineTransform scaleTransform = CGAffineTransformMakeScale(ratio, ratio);
+    
+    CGRect sizeRect = (CGRect) {.size = image.size};
+    CGRect scaledRect = CGRectApplyAffineTransform(sizeRect, scaleTransform);
+    CGRect destRect = CGRectApplyAffineTransform(scaledRect, rotationTransform);
+    
+    CGSize destinationSize = CGSizeMake(destRect.size.width < 1600 ? 1200 : 1600, destRect.size.height < 1600 ? 1200 : 1600);
+    
+    // Draw image
+    UIGraphicsBeginImageContext(destinationSize);
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextTranslateCTM(context, destinationSize.width / 2.0f, destinationSize.height / 2.0f);
+    CGContextRotateCTM(context, rotation);
+    [image drawInRect:CGRectMake(-image.size.width / 2.0f, -image.size.height / 2.0f, image.size.width, image.size.height)];
+    
+    // Save image
+    UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    
+    NSData* dstImageData = UIImageJPEGRepresentation(newImage, 1.0f);
+
+    bool success = [dstImageData writeToFile:_path atomically:YES];
+    if (!success) {
+        [_result sendErrorWithCode:@"IOError" message:@"Unable to write file" details:nil];
+        return;
+    }
+    [_result sendSuccessWithData:_path];
+}
+
+-(CGFloat) getRotationAngleInRadiansForOrintation:(UIDeviceOrientation)orintation {
+    switch (orintation) {
+        case UIDeviceOrientationLandscapeLeft:
+            return GLKMathDegreesToRadians(-90);
+        case UIDeviceOrientationLandscapeRight:
+            return GLKMathDegreesToRadians(90);
+        case UIDeviceOrientationPortraitUpsideDown:
+            return  GLKMathDegreesToRadians(180);
+        case UIDeviceOrientationPortrait:
+        case UIDeviceOrientationFaceUp:
+        case UIDeviceOrientationFaceDown:
+        case UIDeviceOrientationUnknown:
+            return  0;
+    }
+}
+
 @end
 
 // Mirrors FlashMode in flash_mode.dart
 typedef enum {
-  FlashModeOff,
-  FlashModeAuto,
-  FlashModeAlways,
-  FlashModeTorch,
+    FlashModeOff,
+    FlashModeAuto,
+    FlashModeAlways,
+    FlashModeTorch,
 } FlashMode;
 
 static FlashMode getFlashModeForString(NSString *mode) {
-  if ([mode isEqualToString:@"off"]) {
-    return FlashModeOff;
-  } else if ([mode isEqualToString:@"auto"]) {
-    return FlashModeAuto;
-  } else if ([mode isEqualToString:@"always"]) {
-    return FlashModeAlways;
-  } else if ([mode isEqualToString:@"torch"]) {
-    return FlashModeTorch;
-  } else {
-    NSError *error = [NSError errorWithDomain:NSCocoaErrorDomain
-                                         code:NSURLErrorUnknown
-                                     userInfo:@{
-                                       NSLocalizedDescriptionKey : [NSString
-                                           stringWithFormat:@"Unknown flash mode %@", mode]
-                                     }];
-    @throw error;
-  }
+    if ([mode isEqualToString:@"off"]) {
+        return FlashModeOff;
+    } else if ([mode isEqualToString:@"auto"]) {
+        return FlashModeAuto;
+    } else if ([mode isEqualToString:@"always"]) {
+        return FlashModeAlways;
+    } else if ([mode isEqualToString:@"torch"]) {
+        return FlashModeTorch;
+    } else {
+        NSError *error = [NSError errorWithDomain:NSCocoaErrorDomain
+                                             code:NSURLErrorUnknown
+                                         userInfo:@{
+            NSLocalizedDescriptionKey : [NSString
+                                         stringWithFormat:@"Unknown flash mode %@", mode]
+        }];
+        @throw error;
+    }
 }
 
 static OSType getVideoFormatFromString(NSString *videoFormatString) {
-  if ([videoFormatString isEqualToString:@"bgra8888"]) {
-    return kCVPixelFormatType_32BGRA;
-  } else if ([videoFormatString isEqualToString:@"yuv420"]) {
-    return kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
-  } else {
-    NSLog(@"The selected imageFormatGroup is not supported by iOS. Defaulting to brga8888");
-    return kCVPixelFormatType_32BGRA;
-  }
+    if ([videoFormatString isEqualToString:@"bgra8888"]) {
+        return kCVPixelFormatType_32BGRA;
+    } else if ([videoFormatString isEqualToString:@"yuv420"]) {
+        return kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
+    } else {
+        NSLog(@"The selected imageFormatGroup is not supported by iOS. Defaulting to brga8888");
+        return kCVPixelFormatType_32BGRA;
+    }
 }
 
 static AVCaptureFlashMode getAVCaptureFlashModeForFlashMode(FlashMode mode) {
-  switch (mode) {
-    case FlashModeOff:
-      return AVCaptureFlashModeOff;
-    case FlashModeAuto:
-      return AVCaptureFlashModeAuto;
-    case FlashModeAlways:
-      return AVCaptureFlashModeOn;
-    case FlashModeTorch:
-    default:
-      return -1;
-  }
+    switch (mode) {
+        case FlashModeOff:
+            return AVCaptureFlashModeOff;
+        case FlashModeAuto:
+            return AVCaptureFlashModeAuto;
+        case FlashModeAlways:
+            return AVCaptureFlashModeOn;
+        case FlashModeTorch:
+        default:
+            return -1;
+    }
 }
 
 // Mirrors ExposureMode in camera.dart
 typedef enum {
-  ExposureModeAuto,
-  ExposureModeLocked,
-
+    ExposureModeAuto,
+    ExposureModeLocked,
+    
 } ExposureMode;
 
 static NSString *getStringForExposureMode(ExposureMode mode) {
-  switch (mode) {
-    case ExposureModeAuto:
-      return @"auto";
-    case ExposureModeLocked:
-      return @"locked";
-  }
-  NSError *error = [NSError errorWithDomain:NSCocoaErrorDomain
-                                       code:NSURLErrorUnknown
-                                   userInfo:@{
-                                     NSLocalizedDescriptionKey : [NSString
-                                         stringWithFormat:@"Unknown string for exposure mode"]
-                                   }];
-  @throw error;
-}
-
-static ExposureMode getExposureModeForString(NSString *mode) {
-  if ([mode isEqualToString:@"auto"]) {
-    return ExposureModeAuto;
-  } else if ([mode isEqualToString:@"locked"]) {
-    return ExposureModeLocked;
-  } else {
+    switch (mode) {
+        case ExposureModeAuto:
+            return @"auto";
+        case ExposureModeLocked:
+            return @"locked";
+    }
     NSError *error = [NSError errorWithDomain:NSCocoaErrorDomain
                                          code:NSURLErrorUnknown
                                      userInfo:@{
-                                       NSLocalizedDescriptionKey : [NSString
-                                           stringWithFormat:@"Unknown exposure mode %@", mode]
-                                     }];
+        NSLocalizedDescriptionKey : [NSString
+                                     stringWithFormat:@"Unknown string for exposure mode"]
+    }];
     @throw error;
-  }
+}
+
+static ExposureMode getExposureModeForString(NSString *mode) {
+    if ([mode isEqualToString:@"auto"]) {
+        return ExposureModeAuto;
+    } else if ([mode isEqualToString:@"locked"]) {
+        return ExposureModeLocked;
+    } else {
+        NSError *error = [NSError errorWithDomain:NSCocoaErrorDomain
+                                             code:NSURLErrorUnknown
+                                         userInfo:@{
+            NSLocalizedDescriptionKey : [NSString
+                                         stringWithFormat:@"Unknown exposure mode %@", mode]
+        }];
+        @throw error;
+    }
 }
 
 static UIDeviceOrientation getUIDeviceOrientationForString(NSString *orientation) {
-  if ([orientation isEqualToString:@"portraitDown"]) {
-    return UIDeviceOrientationPortraitUpsideDown;
-  } else if ([orientation isEqualToString:@"landscapeLeft"]) {
-    return UIDeviceOrientationLandscapeRight;
-  } else if ([orientation isEqualToString:@"landscapeRight"]) {
-    return UIDeviceOrientationLandscapeLeft;
-  } else if ([orientation isEqualToString:@"portraitUp"]) {
-    return UIDeviceOrientationPortrait;
-  } else {
-    NSError *error = [NSError
-        errorWithDomain:NSCocoaErrorDomain
-                   code:NSURLErrorUnknown
-               userInfo:@{
-                 NSLocalizedDescriptionKey :
-                     [NSString stringWithFormat:@"Unknown device orientation %@", orientation]
-               }];
-    @throw error;
-  }
+    if ([orientation isEqualToString:@"portraitDown"]) {
+        return UIDeviceOrientationPortraitUpsideDown;
+    } else if ([orientation isEqualToString:@"landscapeLeft"]) {
+        return UIDeviceOrientationLandscapeRight;
+    } else if ([orientation isEqualToString:@"landscapeRight"]) {
+        return UIDeviceOrientationLandscapeLeft;
+    } else if ([orientation isEqualToString:@"portraitUp"]) {
+        return UIDeviceOrientationPortrait;
+    } else {
+        NSError *error = [NSError
+                          errorWithDomain:NSCocoaErrorDomain
+                          code:NSURLErrorUnknown
+                          userInfo:@{
+            NSLocalizedDescriptionKey :
+                [NSString stringWithFormat:@"Unknown device orientation %@", orientation]
+        }];
+        @throw error;
+    }
 }
 
 static NSString *getStringForUIDeviceOrientation(UIDeviceOrientation orientation) {
-  switch (orientation) {
-    case UIDeviceOrientationPortraitUpsideDown:
-      return @"portraitDown";
-    case UIDeviceOrientationLandscapeRight:
-      return @"landscapeLeft";
-    case UIDeviceOrientationLandscapeLeft:
-      return @"landscapeRight";
-    case UIDeviceOrientationPortrait:
-    default:
-      return @"portraitUp";
-      break;
-  };
+    switch (orientation) {
+        case UIDeviceOrientationPortraitUpsideDown:
+            return @"portraitDown";
+        case UIDeviceOrientationLandscapeRight:
+            return @"landscapeLeft";
+        case UIDeviceOrientationLandscapeLeft:
+            return @"landscapeRight";
+        case UIDeviceOrientationPortrait:
+        default:
+            return @"portraitUp";
+            break;
+    };
 }
 
 // Mirrors FocusMode in camera.dart
 typedef enum {
-  FocusModeAuto,
-  FocusModeLocked,
+    FocusModeAuto,
+    FocusModeLocked,
 } FocusMode;
 
 static NSString *getStringForFocusMode(FocusMode mode) {
-  switch (mode) {
-    case FocusModeAuto:
-      return @"auto";
-    case FocusModeLocked:
-      return @"locked";
-  }
-  NSError *error = [NSError errorWithDomain:NSCocoaErrorDomain
-                                       code:NSURLErrorUnknown
-                                   userInfo:@{
-                                     NSLocalizedDescriptionKey : [NSString
-                                         stringWithFormat:@"Unknown string for focus mode"]
-                                   }];
-  @throw error;
+    switch (mode) {
+        case FocusModeAuto:
+            return @"auto";
+        case FocusModeLocked:
+            return @"locked";
+    }
+    NSError *error = [NSError errorWithDomain:NSCocoaErrorDomain
+                                         code:NSURLErrorUnknown
+                                     userInfo:@{
+        NSLocalizedDescriptionKey : [NSString
+                                     stringWithFormat:@"Unknown string for focus mode"]
+    }];
+    @throw error;
 }
 
 static FocusMode getFocusModeForString(NSString *mode) {
-  if ([mode isEqualToString:@"auto"]) {
-    return FocusModeAuto;
-  } else if ([mode isEqualToString:@"locked"]) {
-    return FocusModeLocked;
-  } else {
-    NSError *error = [NSError errorWithDomain:NSCocoaErrorDomain
-                                         code:NSURLErrorUnknown
-                                     userInfo:@{
-                                       NSLocalizedDescriptionKey : [NSString
-                                           stringWithFormat:@"Unknown focus mode %@", mode]
-                                     }];
-    @throw error;
-  }
+    if ([mode isEqualToString:@"auto"]) {
+        return FocusModeAuto;
+    } else if ([mode isEqualToString:@"locked"]) {
+        return FocusModeLocked;
+    } else {
+        NSError *error = [NSError errorWithDomain:NSCocoaErrorDomain
+                                             code:NSURLErrorUnknown
+                                         userInfo:@{
+            NSLocalizedDescriptionKey : [NSString
+                                         stringWithFormat:@"Unknown focus mode %@", mode]
+        }];
+        @throw error;
+    }
 }
 
-// Mirrors ResolutionPreset in camera.dart
-typedef enum {
-  veryLow,
-  low,
-  medium,
-  high,
-  veryHigh,
-  ultraHigh,
-  max,
-} ResolutionPreset;
-
 static ResolutionPreset getResolutionPresetForString(NSString *preset) {
-  if ([preset isEqualToString:@"veryLow"]) {
-    return veryLow;
-  } else if ([preset isEqualToString:@"low"]) {
-    return low;
-  } else if ([preset isEqualToString:@"medium"]) {
-    return medium;
-  } else if ([preset isEqualToString:@"high"]) {
-    return high;
-  } else if ([preset isEqualToString:@"veryHigh"]) {
-    return veryHigh;
-  } else if ([preset isEqualToString:@"ultraHigh"]) {
-    return ultraHigh;
-  } else if ([preset isEqualToString:@"max"]) {
-    return max;
-  } else {
-    NSError *error = [NSError errorWithDomain:NSCocoaErrorDomain
-                                         code:NSURLErrorUnknown
-                                     userInfo:@{
-                                       NSLocalizedDescriptionKey : [NSString
-                                           stringWithFormat:@"Unknown resolution preset %@", preset]
-                                     }];
-    @throw error;
-  }
+    if ([preset isEqualToString:@"veryLow"]) {
+        return veryLow;
+    } else if ([preset isEqualToString:@"low"]) {
+        return low;
+    } else if ([preset isEqualToString:@"medium"]) {
+        return medium;
+    } else if ([preset isEqualToString:@"high"]) {
+        return high;
+    } else if ([preset isEqualToString:@"veryHigh"]) {
+        return veryHigh;
+    } else if ([preset isEqualToString:@"ultraHigh"]) {
+        return ultraHigh;
+    } else if ([preset isEqualToString:@"max"]) {
+        return max;
+    } else if ([preset isEqualToString:@"custom43"]) {
+        return custom43;
+    } else {
+        NSError *error = [NSError errorWithDomain:NSCocoaErrorDomain
+                                             code:NSURLErrorUnknown
+                                         userInfo:@{
+            NSLocalizedDescriptionKey : [NSString
+                                         stringWithFormat:@"Unknown resolution preset %@", preset]
+        }];
+        @throw error;
+    }
 }
 
 @interface FLTCam : NSObject <FlutterTexture,
-                              AVCaptureVideoDataOutputSampleBufferDelegate,
-                              AVCaptureAudioDataOutputSampleBufferDelegate>
+AVCaptureVideoDataOutputSampleBufferDelegate,
+AVCaptureAudioDataOutputSampleBufferDelegate>
 @property(readonly, nonatomic) int64_t textureId;
 @property(nonatomic, copy) void (^onFrameAvailable)(void);
 @property BOOL enableAudio;
@@ -342,8 +454,8 @@ static ResolutionPreset getResolutionPresetForString(NSString *preset) {
 @end
 
 @implementation FLTCam {
-  dispatch_queue_t _dispatchQueue;
-  UIDeviceOrientation _deviceOrientation;
+    dispatch_queue_t _dispatchQueue;
+    UIDeviceOrientation _deviceOrientation;
 }
 // Format used for video and image streaming.
 FourCharCode videoFormat = kCVPixelFormatType_32BGRA;
@@ -355,647 +467,761 @@ NSString *const errorMethod = @"error";
                        orientation:(UIDeviceOrientation)orientation
                      dispatchQueue:(dispatch_queue_t)dispatchQueue
                              error:(NSError **)error {
-  self = [super init];
-  NSAssert(self, @"super init cannot be nil");
-  @try {
-    _resolutionPreset = getResolutionPresetForString(resolutionPreset);
-  } @catch (NSError *e) {
-    *error = e;
-  }
-  _enableAudio = enableAudio;
-  _dispatchQueue = dispatchQueue;
-  _captureSession = [[AVCaptureSession alloc] init];
-  _captureDevice = [AVCaptureDevice deviceWithUniqueID:cameraName];
-  _flashMode = _captureDevice.hasFlash ? FlashModeAuto : FlashModeOff;
-  _exposureMode = ExposureModeAuto;
-  _focusMode = FocusModeAuto;
-  _lockedCaptureOrientation = UIDeviceOrientationUnknown;
-  _deviceOrientation = orientation;
-
-  NSError *localError = nil;
-  _captureVideoInput = [AVCaptureDeviceInput deviceInputWithDevice:_captureDevice
-                                                             error:&localError];
-
-  if (localError) {
-    *error = localError;
-    return nil;
-  }
-
-  _captureVideoOutput = [AVCaptureVideoDataOutput new];
-  _captureVideoOutput.videoSettings =
-      @{(NSString *)kCVPixelBufferPixelFormatTypeKey : @(videoFormat)};
-  [_captureVideoOutput setAlwaysDiscardsLateVideoFrames:YES];
-  [_captureVideoOutput setSampleBufferDelegate:self queue:dispatch_get_main_queue()];
-
-  AVCaptureConnection *connection =
-      [AVCaptureConnection connectionWithInputPorts:_captureVideoInput.ports
-                                             output:_captureVideoOutput];
-
-  if ([_captureDevice position] == AVCaptureDevicePositionFront) {
-    connection.videoMirrored = YES;
-  }
-
-  [_captureSession addInputWithNoConnections:_captureVideoInput];
-  [_captureSession addOutputWithNoConnections:_captureVideoOutput];
-  [_captureSession addConnection:connection];
-
-  if (@available(iOS 10.0, *)) {
-    _capturePhotoOutput = [AVCapturePhotoOutput new];
-    [_capturePhotoOutput setHighResolutionCaptureEnabled:YES];
-    [_captureSession addOutput:_capturePhotoOutput];
-  }
-  _motionManager = [[CMMotionManager alloc] init];
-  [_motionManager startAccelerometerUpdates];
-
-  [self setCaptureSessionPreset:_resolutionPreset];
-  [self updateOrientation];
-
-  return self;
+    self = [super init];
+    NSAssert(self, @"super init cannot be nil");
+    @try {
+        _resolutionPreset = getResolutionPresetForString(resolutionPreset);
+    } @catch (NSError *e) {
+        *error = e;
+    }
+    _enableAudio = enableAudio;
+    _dispatchQueue = dispatchQueue;
+    _captureSession = [[AVCaptureSession alloc] init];
+    _captureDevice = [AVCaptureDevice deviceWithUniqueID:cameraName];
+    _flashMode = _captureDevice.hasFlash ? FlashModeAuto : FlashModeOff;
+    _exposureMode = ExposureModeAuto;
+    _focusMode = FocusModeAuto;
+    _lockedCaptureOrientation = UIDeviceOrientationUnknown;
+    _deviceOrientation = orientation;
+    
+    NSError *localError = nil;
+    _captureVideoInput = [AVCaptureDeviceInput deviceInputWithDevice:_captureDevice
+                                                               error:&localError];
+    
+    if (localError) {
+        *error = localError;
+        return nil;
+    }
+    
+    _captureVideoOutput = [AVCaptureVideoDataOutput new];
+    _captureVideoOutput.videoSettings =
+    @{(NSString *)kCVPixelBufferPixelFormatTypeKey : @(videoFormat)};
+    [_captureVideoOutput setAlwaysDiscardsLateVideoFrames:YES];
+    [_captureVideoOutput setSampleBufferDelegate:self queue:dispatch_get_main_queue()];
+    
+    AVCaptureConnection *connection =
+    [AVCaptureConnection connectionWithInputPorts:_captureVideoInput.ports
+                                           output:_captureVideoOutput];
+    
+    if ([_captureDevice position] == AVCaptureDevicePositionFront) {
+        connection.videoMirrored = YES;
+    }
+    
+    [_captureSession addInputWithNoConnections:_captureVideoInput];
+    [_captureSession addOutputWithNoConnections:_captureVideoOutput];
+    [_captureSession addConnection:connection];
+    
+    if (@available(iOS 10.0, *)) {
+        _capturePhotoOutput = [AVCapturePhotoOutput new];
+        [_capturePhotoOutput setHighResolutionCaptureEnabled:YES];
+        [_captureSession addOutput:_capturePhotoOutput];
+    }
+    _motionManager = [[CMMotionManager alloc] init];
+    [_motionManager startAccelerometerUpdates];
+    
+    
+    [self setActiveFormatForCamera:_captureDevice
+                        resolution:[self setCaptureSessionPreset:_resolutionPreset
+                                                   captureDevice:_captureDevice]];
+    
+    [self updateOrientation];
+    
+    return self;
 }
 
 - (void)start {
-  [_captureSession startRunning];
+    [_captureSession startRunning];
 }
 
 - (void)stop {
-  [_captureSession stopRunning];
+    [_captureSession stopRunning];
 }
 
 - (void)setDeviceOrientation:(UIDeviceOrientation)orientation {
-  if (_deviceOrientation == orientation) {
-    return;
-  }
-
-  _deviceOrientation = orientation;
-  [self updateOrientation];
+    if (_deviceOrientation == orientation) {
+        return;
+    }
+    
+    _deviceOrientation = orientation;
+    [self updateOrientation];
 }
 
 - (void)updateOrientation {
-  if (_isRecording) {
-    return;
-  }
-
-  UIDeviceOrientation orientation = (_lockedCaptureOrientation != UIDeviceOrientationUnknown)
-                                        ? _lockedCaptureOrientation
-                                        : _deviceOrientation;
-
-  [self updateOrientation:orientation forCaptureOutput:_capturePhotoOutput];
-  [self updateOrientation:orientation forCaptureOutput:_captureVideoOutput];
+    if (_isRecording) {
+        return;
+    }
+    
+    UIDeviceOrientation orientation = (_lockedCaptureOrientation != UIDeviceOrientationUnknown)
+    ? _lockedCaptureOrientation
+    : _deviceOrientation;
+    
+    [self updateOrientation:orientation forCaptureOutput:_capturePhotoOutput];
+    [self updateOrientation:orientation forCaptureOutput:_captureVideoOutput];
 }
 
 - (void)updateOrientation:(UIDeviceOrientation)orientation
          forCaptureOutput:(AVCaptureOutput *)captureOutput {
-  if (!captureOutput) {
-    return;
-  }
-
-  AVCaptureConnection *connection = [captureOutput connectionWithMediaType:AVMediaTypeVideo];
-  if (connection && connection.isVideoOrientationSupported) {
-    connection.videoOrientation = [self getVideoOrientationForDeviceOrientation:orientation];
-  }
+    if (!captureOutput) {
+        return;
+    }
+    
+    AVCaptureConnection *connection = [captureOutput connectionWithMediaType:AVMediaTypeVideo];
+    if (connection && connection.isVideoOrientationSupported) {
+        connection.videoOrientation = [self getVideoOrientationForDeviceOrientation:orientation];
+    }
 }
 
 - (void)captureToFile:(FLTThreadSafeFlutterResult *)result API_AVAILABLE(ios(10)) {
-  AVCapturePhotoSettings *settings = [AVCapturePhotoSettings photoSettings];
-  if (_resolutionPreset == max) {
-    [settings setHighResolutionPhotoEnabled:YES];
-  }
-
-  AVCaptureFlashMode avFlashMode = getAVCaptureFlashModeForFlashMode(_flashMode);
-  if (avFlashMode != -1) {
-    [settings setFlashMode:avFlashMode];
-  }
-  NSError *error;
-  NSString *path = [self getTemporaryFilePathWithExtension:@"jpg"
-                                                 subfolder:@"pictures"
-                                                    prefix:@"CAP_"
-                                                     error:error];
-  if (error) {
-    [result sendError:error];
-    return;
-  }
-
-  [_capturePhotoOutput capturePhotoWithSettings:settings
-                                       delegate:[[FLTSavePhotoDelegate alloc] initWithPath:path
-                                                                                    result:result]];
+    AVCapturePhotoSettings *settings = [AVCapturePhotoSettings photoSettings];
+    if (_resolutionPreset == max) {
+        [settings setHighResolutionPhotoEnabled:YES];
+    }
+    
+    AVCaptureFlashMode avFlashMode = getAVCaptureFlashModeForFlashMode(_flashMode);
+    if (avFlashMode != -1) {
+        [settings setFlashMode:avFlashMode];
+    }
+    NSError *error;
+    NSString *path = [self getTemporaryFilePathWithExtension:@"jpg"
+                                                   subfolder:@"pictures"
+                                                      prefix:@"CAP_"
+                                                       error:error];
+    if (error) {
+        [result sendError:error];
+        return;
+    }
+    
+    UIDeviceOrientation orientation;
+    if(_lockedCaptureOrientation == UIDeviceOrientationUnknown) {
+        orientation = _deviceOrientation;
+    }
+    else {
+        switch(_deviceOrientation) {
+            case UIDeviceOrientationUnknown:
+            case UIDeviceOrientationFaceUp:
+            case UIDeviceOrientationFaceDown:
+            case UIDeviceOrientationPortrait:
+            {
+                orientation = UIDeviceOrientationPortrait;
+                break;
+            }
+            case UIDeviceOrientationLandscapeLeft:
+            {
+                orientation = UIDeviceOrientationLandscapeRight;
+                break;
+            }
+            case UIDeviceOrientationLandscapeRight:
+            {
+                orientation = UIDeviceOrientationLandscapeLeft;
+            }
+            case UIDeviceOrientationPortraitUpsideDown: {
+                orientation = UIDeviceOrientationPortraitUpsideDown;
+            }
+        }
+    }
+    
+    [_capturePhotoOutput capturePhotoWithSettings:settings
+                                         delegate:[[FLTSavePhotoDelegate alloc] initWithPath:path
+                                                                                      result:result
+                                                                           deviceOrientation:_deviceOrientation
+                                                                           lockedOrientation:_lockedCaptureOrientation
+                                                                            resolutionPreset:_resolutionPreset]];
 }
 
 - (AVCaptureVideoOrientation)getVideoOrientationForDeviceOrientation:
-    (UIDeviceOrientation)deviceOrientation {
-  if (deviceOrientation == UIDeviceOrientationPortrait) {
-    return AVCaptureVideoOrientationPortrait;
-  } else if (deviceOrientation == UIDeviceOrientationLandscapeLeft) {
-    // Note: device orientation is flipped compared to video orientation. When UIDeviceOrientation
-    // is landscape left the video orientation should be landscape right.
-    return AVCaptureVideoOrientationLandscapeRight;
-  } else if (deviceOrientation == UIDeviceOrientationLandscapeRight) {
-    // Note: device orientation is flipped compared to video orientation. When UIDeviceOrientation
-    // is landscape right the video orientation should be landscape left.
-    return AVCaptureVideoOrientationLandscapeLeft;
-  } else if (deviceOrientation == UIDeviceOrientationPortraitUpsideDown) {
-    return AVCaptureVideoOrientationPortraitUpsideDown;
-  } else {
-    return AVCaptureVideoOrientationPortrait;
-  }
+(UIDeviceOrientation)deviceOrientation {
+    if (deviceOrientation == UIDeviceOrientationPortrait) {
+        return AVCaptureVideoOrientationPortrait;
+    } else if (deviceOrientation == UIDeviceOrientationLandscapeLeft) {
+        // Note: device orientation is flipped compared to video orientation. When UIDeviceOrientation
+        // is landscape left the video orientation should be landscape right.
+        return AVCaptureVideoOrientationLandscapeRight;
+    } else if (deviceOrientation == UIDeviceOrientationLandscapeRight) {
+        // Note: device orientation is flipped compared to video orientation. When UIDeviceOrientation
+        // is landscape right the video orientation should be landscape left.
+        return AVCaptureVideoOrientationLandscapeLeft;
+    } else if (deviceOrientation == UIDeviceOrientationPortraitUpsideDown) {
+        return AVCaptureVideoOrientationPortraitUpsideDown;
+    } else {
+        return AVCaptureVideoOrientationPortrait;
+    }
 }
 
 - (NSString *)getTemporaryFilePathWithExtension:(NSString *)extension
                                       subfolder:(NSString *)subfolder
                                          prefix:(NSString *)prefix
                                           error:(NSError *)error {
-  NSString *docDir =
-      NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES)[0];
-  NSString *fileDir =
-      [[docDir stringByAppendingPathComponent:@"camera"] stringByAppendingPathComponent:subfolder];
-  NSString *fileName = [prefix stringByAppendingString:[[NSUUID UUID] UUIDString]];
-  NSString *file =
-      [[fileDir stringByAppendingPathComponent:fileName] stringByAppendingPathExtension:extension];
-
-  NSFileManager *fm = [NSFileManager defaultManager];
-  if (![fm fileExistsAtPath:fileDir]) {
-    [[NSFileManager defaultManager] createDirectoryAtPath:fileDir
-                              withIntermediateDirectories:true
-                                               attributes:nil
-                                                    error:&error];
-    if (error) {
-      return nil;
+    NSString *docDir =
+    NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES)[0];
+    NSString *fileDir =
+    [[docDir stringByAppendingPathComponent:@"camera"] stringByAppendingPathComponent:subfolder];
+    NSString *fileName = [prefix stringByAppendingString:[[NSUUID UUID] UUIDString]];
+    NSString *file =
+    [[fileDir stringByAppendingPathComponent:fileName] stringByAppendingPathExtension:extension];
+    
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if (![fm fileExistsAtPath:fileDir]) {
+        [[NSFileManager defaultManager] createDirectoryAtPath:fileDir
+                                  withIntermediateDirectories:true
+                                                   attributes:nil
+                                                        error:&error];
+        if (error) {
+            return nil;
+        }
     }
-  }
-
-  return file;
+    
+    return file;
 }
 
-- (void)setCaptureSessionPreset:(ResolutionPreset)resolutionPreset {
-  switch (resolutionPreset) {
-    case max:
-    case ultraHigh:
-      if ([_captureSession canSetSessionPreset:AVCaptureSessionPreset3840x2160]) {
-        _captureSession.sessionPreset = AVCaptureSessionPreset3840x2160;
-        _previewSize = CGSizeMake(3840, 2160);
-        break;
-      }
-      if ([_captureSession canSetSessionPreset:AVCaptureSessionPresetHigh]) {
-        _captureSession.sessionPreset = AVCaptureSessionPresetHigh;
-        _previewSize =
-            CGSizeMake(_captureDevice.activeFormat.highResolutionStillImageDimensions.width,
-                       _captureDevice.activeFormat.highResolutionStillImageDimensions.height);
-        break;
-      }
-    case veryHigh:
-      if ([_captureSession canSetSessionPreset:AVCaptureSessionPreset1920x1080]) {
-        _captureSession.sessionPreset = AVCaptureSessionPreset1920x1080;
-        _previewSize = CGSizeMake(1920, 1080);
-        break;
-      }
-    case high:
-      if ([_captureSession canSetSessionPreset:AVCaptureSessionPreset1280x720]) {
-        _captureSession.sessionPreset = AVCaptureSessionPreset1280x720;
-        _previewSize = CGSizeMake(1280, 720);
-        break;
-      }
-    case medium:
-      if ([_captureSession canSetSessionPreset:AVCaptureSessionPreset640x480]) {
-        _captureSession.sessionPreset = AVCaptureSessionPreset640x480;
-        _previewSize = CGSizeMake(640, 480);
-        break;
-      }
-    case low:
-      if ([_captureSession canSetSessionPreset:AVCaptureSessionPreset352x288]) {
-        _captureSession.sessionPreset = AVCaptureSessionPreset352x288;
-        _previewSize = CGSizeMake(352, 288);
-        break;
-      }
-    default:
-      if ([_captureSession canSetSessionPreset:AVCaptureSessionPresetLow]) {
-        _captureSession.sessionPreset = AVCaptureSessionPresetLow;
-        _previewSize = CGSizeMake(352, 288);
-      } else {
-        NSError *error =
-            [NSError errorWithDomain:NSCocoaErrorDomain
-                                code:NSURLErrorUnknown
-                            userInfo:@{
-                              NSLocalizedDescriptionKey :
-                                  @"No capture session available for current capture session."
-                            }];
-        @throw error;
-      }
-  }
+
+- (NSCameraResolution*)setCaptureSessionPreset:(ResolutionPreset)resolutionPreset
+                  captureDevice:(AVCaptureDevice *)captureDevice{
+    
+    [self setCaptureSessionDefaultPreset:resolutionPreset];
+    
+    
+    if(resolutionPreset == custom43) {
+        NSMutableArray* resolutions = [[NSMutableArray alloc] init];
+
+        for (AVCaptureDeviceFormat* format in captureDevice.formats) {
+            CMVideoFormatDescriptionRef formatDescription = format.formatDescription;
+            CMVideoDimensions dimentions = CMVideoFormatDescriptionGetDimensions(formatDescription);
+            float aspectRatio = ((float) dimentions.width) / dimentions.height;
+            
+            if(aspectRatio >= PREFFERED_43FORMAT_LOW_ASPECT_RATIO &&
+               aspectRatio <= PREFFERED_43FORMAT_HIGH_ASPECT_RATIO &&
+               dimentions.width >= PREFFERED_43FORMAT_WIDTH &&
+               dimentions.height >= PREFFERED_43FORMAT_HEIGHT) {
+                NSCameraResolution* resolution = [[NSCameraResolution alloc] initWithWidth:dimentions.width andHeight:dimentions.height andFormat:format];
+                [resolutions addObject:resolution];
+            }
+        }
+        
+     [resolutions sortUsingComparator:compareCamaraResolution];
+     NSLog(@"%@", resolutions);
+        if([resolutions count] > 0) {
+            NSCameraResolution* resolution = [resolutions objectAtIndex:0];
+            NSLog(@"Selected 4:3 resolution is %@", resolution);
+            _previewSize = CGSizeMake(resolution.width, resolution.heigh);
+            return resolution;
+        }
+        return nil;
+    }
+    return nil;
+}
+
+NSComparisonResult (^compareCamaraResolution) (id,id) = ^(id obj1, id obj2)
+{
+    if([obj1 isKindOfClass:[NSCameraResolution class]] && [obj2 isKindOfClass:[NSCameraResolution class]]) {
+        NSCameraResolution* r1 = obj1;
+        NSCameraResolution* r2 = obj2;
+        if(r1.width < r2.width) {
+            return (NSComparisonResult) NSOrderedAscending;
+        } else if(r1.width > r2.width) {
+            return (NSComparisonResult) NSOrderedDescending;
+        } else  if(r1.heigh < r2.heigh) {
+            return (NSComparisonResult) NSOrderedAscending;
+        } else if(r1.heigh > r2.heigh) {
+            return (NSComparisonResult) NSOrderedDescending;
+        }
+    }
+    return (NSComparisonResult)NSOrderedSame;
+};
+
+-(void) setActiveFormatForCamera:(AVCaptureDevice*)device
+                      resolution:(NSCameraResolution* _Nullable) resolution {
+    if(resolution == nil) {
+        NSLog(@"Resolution is nil, skip camera device configuring");
+        return;
+    }
+    NSError* error = nil;
+    bool isLocked = [device lockForConfiguration:&error];
+    if(!isLocked) {
+        NSLog(@"Fail to lock camera device to configure: %@", error);
+        return;
+    }
+    [device setActiveFormat: resolution.format];
+    [device unlockForConfiguration];
+    NSLog(@"Camera device was configured to format %@", resolution.format);
+}
+
+- (void)setCaptureSessionDefaultPreset:(ResolutionPreset)resolutionPreset {
+    switch (resolutionPreset) {
+        case max:
+        case ultraHigh:
+            if ([_captureSession canSetSessionPreset:AVCaptureSessionPreset3840x2160]) {
+                _captureSession.sessionPreset = AVCaptureSessionPreset3840x2160;
+                _previewSize = CGSizeMake(3840, 2160);
+                break;
+            }
+            if ([_captureSession canSetSessionPreset:AVCaptureSessionPresetHigh]) {
+                _captureSession.sessionPreset = AVCaptureSessionPresetHigh;
+                _previewSize =
+                CGSizeMake(_captureDevice.activeFormat.highResolutionStillImageDimensions.width,
+                           _captureDevice.activeFormat.highResolutionStillImageDimensions.height);
+                break;
+            }
+        case veryHigh:
+            if ([_captureSession canSetSessionPreset:AVCaptureSessionPreset1920x1080]) {
+                _captureSession.sessionPreset = AVCaptureSessionPreset1920x1080;
+                _previewSize = CGSizeMake(1920, 1080);
+                break;
+            }
+        case custom43:
+            if ([_captureSession canSetSessionPreset:AVCaptureSessionPreset1920x1080]) {
+                _captureSession.sessionPreset = AVCaptureSessionPreset1920x1080;
+                _previewSize = CGSizeMake(1920, 1080);
+                break;
+            }
+        case high:
+            if ([_captureSession canSetSessionPreset:AVCaptureSessionPreset1280x720]) {
+                _captureSession.sessionPreset = AVCaptureSessionPreset1280x720;
+                _previewSize = CGSizeMake(1280, 720);
+                break;
+            }
+        case medium:
+            if ([_captureSession canSetSessionPreset:AVCaptureSessionPreset640x480]) {
+                _captureSession.sessionPreset = AVCaptureSessionPreset640x480;
+                _previewSize = CGSizeMake(640, 480);
+                break;
+            }
+        case low:
+            if ([_captureSession canSetSessionPreset:AVCaptureSessionPreset352x288]) {
+                _captureSession.sessionPreset = AVCaptureSessionPreset352x288;
+                _previewSize = CGSizeMake(352, 288);
+                break;
+            }
+        default:
+            if ([_captureSession canSetSessionPreset:AVCaptureSessionPresetLow]) {
+                _captureSession.sessionPreset = AVCaptureSessionPresetLow;
+                _previewSize = CGSizeMake(352, 288);
+            } else {
+                NSError *error =
+                [NSError errorWithDomain:NSCocoaErrorDomain
+                                    code:NSURLErrorUnknown
+                                userInfo:@{
+                    NSLocalizedDescriptionKey :
+                        @"No capture session available for current capture session."
+                }];
+                @throw error;
+            }
+    }
 }
 
 - (void)captureOutput:(AVCaptureOutput *)output
-    didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
-           fromConnection:(AVCaptureConnection *)connection {
-  if (output == _captureVideoOutput) {
-    CVPixelBufferRef newBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
-    CFRetain(newBuffer);
-    CVPixelBufferRef old = _latestPixelBuffer;
-    while (!OSAtomicCompareAndSwapPtrBarrier(old, newBuffer, (void **)&_latestPixelBuffer)) {
-      old = _latestPixelBuffer;
-    }
-    if (old != nil) {
-      CFRelease(old);
-    }
-    if (_onFrameAvailable) {
-      _onFrameAvailable();
-    }
-  }
-  if (!CMSampleBufferDataIsReady(sampleBuffer)) {
-    [_methodChannel invokeMethod:errorMethod
-                       arguments:@"sample buffer is not ready. Skipping sample"];
-    return;
-  }
-  if (_isStreamingImages) {
-    if (_imageStreamHandler.eventSink) {
-      CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
-      CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
-
-      size_t imageWidth = CVPixelBufferGetWidth(pixelBuffer);
-      size_t imageHeight = CVPixelBufferGetHeight(pixelBuffer);
-
-      NSMutableArray *planes = [NSMutableArray array];
-
-      const Boolean isPlanar = CVPixelBufferIsPlanar(pixelBuffer);
-      size_t planeCount;
-      if (isPlanar) {
-        planeCount = CVPixelBufferGetPlaneCount(pixelBuffer);
-      } else {
-        planeCount = 1;
-      }
-
-      for (int i = 0; i < planeCount; i++) {
-        void *planeAddress;
-        size_t bytesPerRow;
-        size_t height;
-        size_t width;
-
-        if (isPlanar) {
-          planeAddress = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, i);
-          bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, i);
-          height = CVPixelBufferGetHeightOfPlane(pixelBuffer, i);
-          width = CVPixelBufferGetWidthOfPlane(pixelBuffer, i);
-        } else {
-          planeAddress = CVPixelBufferGetBaseAddress(pixelBuffer);
-          bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer);
-          height = CVPixelBufferGetHeight(pixelBuffer);
-          width = CVPixelBufferGetWidth(pixelBuffer);
-        }
-
-        NSNumber *length = @(bytesPerRow * height);
-        NSData *bytes = [NSData dataWithBytes:planeAddress length:length.unsignedIntegerValue];
-
-        NSMutableDictionary *planeBuffer = [NSMutableDictionary dictionary];
-        planeBuffer[@"bytesPerRow"] = @(bytesPerRow);
-        planeBuffer[@"width"] = @(width);
-        planeBuffer[@"height"] = @(height);
-        planeBuffer[@"bytes"] = [FlutterStandardTypedData typedDataWithBytes:bytes];
-
-        [planes addObject:planeBuffer];
-      }
-
-      NSMutableDictionary *imageBuffer = [NSMutableDictionary dictionary];
-      imageBuffer[@"width"] = [NSNumber numberWithUnsignedLong:imageWidth];
-      imageBuffer[@"height"] = [NSNumber numberWithUnsignedLong:imageHeight];
-      imageBuffer[@"format"] = @(videoFormat);
-      imageBuffer[@"planes"] = planes;
-      imageBuffer[@"lensAperture"] = [NSNumber numberWithFloat:[_captureDevice lensAperture]];
-      Float64 exposureDuration = CMTimeGetSeconds([_captureDevice exposureDuration]);
-      Float64 nsExposureDuration = 1000000000 * exposureDuration;
-      imageBuffer[@"sensorExposureTime"] = [NSNumber numberWithInt:nsExposureDuration];
-      imageBuffer[@"sensorSensitivity"] = [NSNumber numberWithFloat:[_captureDevice ISO]];
-
-      _imageStreamHandler.eventSink(imageBuffer);
-
-      CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
-    }
-  }
-  if (_isRecording && !_isRecordingPaused) {
-    if (_videoWriter.status == AVAssetWriterStatusFailed) {
-      [_methodChannel invokeMethod:errorMethod
-                         arguments:[NSString stringWithFormat:@"%@", _videoWriter.error]];
-      return;
-    }
-
-    CFRetain(sampleBuffer);
-    CMTime currentSampleTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
-
-    if (_videoWriter.status != AVAssetWriterStatusWriting) {
-      [_videoWriter startWriting];
-      [_videoWriter startSessionAtSourceTime:currentSampleTime];
-    }
-
+didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
+       fromConnection:(AVCaptureConnection *)connection {
     if (output == _captureVideoOutput) {
-      if (_videoIsDisconnected) {
-        _videoIsDisconnected = NO;
-
-        if (_videoTimeOffset.value == 0) {
-          _videoTimeOffset = CMTimeSubtract(currentSampleTime, _lastVideoSampleTime);
-        } else {
-          CMTime offset = CMTimeSubtract(currentSampleTime, _lastVideoSampleTime);
-          _videoTimeOffset = CMTimeAdd(_videoTimeOffset, offset);
+        CVPixelBufferRef newBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+        CFRetain(newBuffer);
+        CVPixelBufferRef old = _latestPixelBuffer;
+        while (!OSAtomicCompareAndSwapPtrBarrier(old, newBuffer, (void **)&_latestPixelBuffer)) {
+            old = _latestPixelBuffer;
         }
-
-        return;
-      }
-
-      _lastVideoSampleTime = currentSampleTime;
-
-      CVPixelBufferRef nextBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
-      CMTime nextSampleTime = CMTimeSubtract(_lastVideoSampleTime, _videoTimeOffset);
-      [_videoAdaptor appendPixelBuffer:nextBuffer withPresentationTime:nextSampleTime];
-    } else {
-      CMTime dur = CMSampleBufferGetDuration(sampleBuffer);
-
-      if (dur.value > 0) {
-        currentSampleTime = CMTimeAdd(currentSampleTime, dur);
-      }
-
-      if (_audioIsDisconnected) {
-        _audioIsDisconnected = NO;
-
-        if (_audioTimeOffset.value == 0) {
-          _audioTimeOffset = CMTimeSubtract(currentSampleTime, _lastAudioSampleTime);
-        } else {
-          CMTime offset = CMTimeSubtract(currentSampleTime, _lastAudioSampleTime);
-          _audioTimeOffset = CMTimeAdd(_audioTimeOffset, offset);
+        if (old != nil) {
+            CFRelease(old);
         }
-
-        return;
-      }
-
-      _lastAudioSampleTime = currentSampleTime;
-
-      if (_audioTimeOffset.value != 0) {
-        CFRelease(sampleBuffer);
-        sampleBuffer = [self adjustTime:sampleBuffer by:_audioTimeOffset];
-      }
-
-      [self newAudioSample:sampleBuffer];
+        if (_onFrameAvailable) {
+            _onFrameAvailable();
+        }
     }
-
-    CFRelease(sampleBuffer);
-  }
+    if (!CMSampleBufferDataIsReady(sampleBuffer)) {
+        [_methodChannel invokeMethod:errorMethod
+                           arguments:@"sample buffer is not ready. Skipping sample"];
+        return;
+    }
+    if (_isStreamingImages) {
+        if (_imageStreamHandler.eventSink) {
+            CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+            CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+            
+            size_t imageWidth = CVPixelBufferGetWidth(pixelBuffer);
+            size_t imageHeight = CVPixelBufferGetHeight(pixelBuffer);
+            
+            NSMutableArray *planes = [NSMutableArray array];
+            
+            const Boolean isPlanar = CVPixelBufferIsPlanar(pixelBuffer);
+            size_t planeCount;
+            if (isPlanar) {
+                planeCount = CVPixelBufferGetPlaneCount(pixelBuffer);
+            } else {
+                planeCount = 1;
+            }
+            
+            for (int i = 0; i < planeCount; i++) {
+                void *planeAddress;
+                size_t bytesPerRow;
+                size_t height;
+                size_t width;
+                
+                if (isPlanar) {
+                    planeAddress = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, i);
+                    bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, i);
+                    height = CVPixelBufferGetHeightOfPlane(pixelBuffer, i);
+                    width = CVPixelBufferGetWidthOfPlane(pixelBuffer, i);
+                } else {
+                    planeAddress = CVPixelBufferGetBaseAddress(pixelBuffer);
+                    bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer);
+                    height = CVPixelBufferGetHeight(pixelBuffer);
+                    width = CVPixelBufferGetWidth(pixelBuffer);
+                }
+                
+                NSNumber *length = @(bytesPerRow * height);
+                NSData *bytes = [NSData dataWithBytes:planeAddress length:length.unsignedIntegerValue];
+                
+                NSMutableDictionary *planeBuffer = [NSMutableDictionary dictionary];
+                planeBuffer[@"bytesPerRow"] = @(bytesPerRow);
+                planeBuffer[@"width"] = @(width);
+                planeBuffer[@"height"] = @(height);
+                planeBuffer[@"bytes"] = [FlutterStandardTypedData typedDataWithBytes:bytes];
+                
+                [planes addObject:planeBuffer];
+            }
+            
+            NSMutableDictionary *imageBuffer = [NSMutableDictionary dictionary];
+            imageBuffer[@"width"] = [NSNumber numberWithUnsignedLong:imageWidth];
+            imageBuffer[@"height"] = [NSNumber numberWithUnsignedLong:imageHeight];
+            imageBuffer[@"format"] = @(videoFormat);
+            imageBuffer[@"planes"] = planes;
+            imageBuffer[@"lensAperture"] = [NSNumber numberWithFloat:[_captureDevice lensAperture]];
+            Float64 exposureDuration = CMTimeGetSeconds([_captureDevice exposureDuration]);
+            Float64 nsExposureDuration = 1000000000 * exposureDuration;
+            imageBuffer[@"sensorExposureTime"] = [NSNumber numberWithInt:nsExposureDuration];
+            imageBuffer[@"sensorSensitivity"] = [NSNumber numberWithFloat:[_captureDevice ISO]];
+            
+            _imageStreamHandler.eventSink(imageBuffer);
+            
+            CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+        }
+    }
+    if (_isRecording && !_isRecordingPaused) {
+        if (_videoWriter.status == AVAssetWriterStatusFailed) {
+            [_methodChannel invokeMethod:errorMethod
+                               arguments:[NSString stringWithFormat:@"%@", _videoWriter.error]];
+            return;
+        }
+        
+        CFRetain(sampleBuffer);
+        CMTime currentSampleTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+        
+        if (_videoWriter.status != AVAssetWriterStatusWriting) {
+            [_videoWriter startWriting];
+            [_videoWriter startSessionAtSourceTime:currentSampleTime];
+        }
+        
+        if (output == _captureVideoOutput) {
+            if (_videoIsDisconnected) {
+                _videoIsDisconnected = NO;
+                
+                if (_videoTimeOffset.value == 0) {
+                    _videoTimeOffset = CMTimeSubtract(currentSampleTime, _lastVideoSampleTime);
+                } else {
+                    CMTime offset = CMTimeSubtract(currentSampleTime, _lastVideoSampleTime);
+                    _videoTimeOffset = CMTimeAdd(_videoTimeOffset, offset);
+                }
+                
+                return;
+            }
+            
+            _lastVideoSampleTime = currentSampleTime;
+            
+            CVPixelBufferRef nextBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+            CMTime nextSampleTime = CMTimeSubtract(_lastVideoSampleTime, _videoTimeOffset);
+            [_videoAdaptor appendPixelBuffer:nextBuffer withPresentationTime:nextSampleTime];
+        } else {
+            CMTime dur = CMSampleBufferGetDuration(sampleBuffer);
+            
+            if (dur.value > 0) {
+                currentSampleTime = CMTimeAdd(currentSampleTime, dur);
+            }
+            
+            if (_audioIsDisconnected) {
+                _audioIsDisconnected = NO;
+                
+                if (_audioTimeOffset.value == 0) {
+                    _audioTimeOffset = CMTimeSubtract(currentSampleTime, _lastAudioSampleTime);
+                } else {
+                    CMTime offset = CMTimeSubtract(currentSampleTime, _lastAudioSampleTime);
+                    _audioTimeOffset = CMTimeAdd(_audioTimeOffset, offset);
+                }
+                
+                return;
+            }
+            
+            _lastAudioSampleTime = currentSampleTime;
+            
+            if (_audioTimeOffset.value != 0) {
+                CFRelease(sampleBuffer);
+                sampleBuffer = [self adjustTime:sampleBuffer by:_audioTimeOffset];
+            }
+            
+            [self newAudioSample:sampleBuffer];
+        }
+        
+        CFRelease(sampleBuffer);
+    }
 }
 
 - (CMSampleBufferRef)adjustTime:(CMSampleBufferRef)sample by:(CMTime)offset CF_RETURNS_RETAINED {
-  CMItemCount count;
-  CMSampleBufferGetSampleTimingInfoArray(sample, 0, nil, &count);
-  CMSampleTimingInfo *pInfo = malloc(sizeof(CMSampleTimingInfo) * count);
-  CMSampleBufferGetSampleTimingInfoArray(sample, count, pInfo, &count);
-  for (CMItemCount i = 0; i < count; i++) {
-    pInfo[i].decodeTimeStamp = CMTimeSubtract(pInfo[i].decodeTimeStamp, offset);
-    pInfo[i].presentationTimeStamp = CMTimeSubtract(pInfo[i].presentationTimeStamp, offset);
-  }
-  CMSampleBufferRef sout;
-  CMSampleBufferCreateCopyWithNewTiming(nil, sample, count, pInfo, &sout);
-  free(pInfo);
-  return sout;
+    CMItemCount count;
+    CMSampleBufferGetSampleTimingInfoArray(sample, 0, nil, &count);
+    CMSampleTimingInfo *pInfo = malloc(sizeof(CMSampleTimingInfo) * count);
+    CMSampleBufferGetSampleTimingInfoArray(sample, count, pInfo, &count);
+    for (CMItemCount i = 0; i < count; i++) {
+        pInfo[i].decodeTimeStamp = CMTimeSubtract(pInfo[i].decodeTimeStamp, offset);
+        pInfo[i].presentationTimeStamp = CMTimeSubtract(pInfo[i].presentationTimeStamp, offset);
+    }
+    CMSampleBufferRef sout;
+    CMSampleBufferCreateCopyWithNewTiming(nil, sample, count, pInfo, &sout);
+    free(pInfo);
+    return sout;
 }
 
 - (void)newVideoSample:(CMSampleBufferRef)sampleBuffer {
-  if (_videoWriter.status != AVAssetWriterStatusWriting) {
-    if (_videoWriter.status == AVAssetWriterStatusFailed) {
-      [_methodChannel invokeMethod:errorMethod
-                         arguments:[NSString stringWithFormat:@"%@", _videoWriter.error]];
+    if (_videoWriter.status != AVAssetWriterStatusWriting) {
+        if (_videoWriter.status == AVAssetWriterStatusFailed) {
+            [_methodChannel invokeMethod:errorMethod
+                               arguments:[NSString stringWithFormat:@"%@", _videoWriter.error]];
+        }
+        return;
     }
-    return;
-  }
-  if (_videoWriterInput.readyForMoreMediaData) {
-    if (![_videoWriterInput appendSampleBuffer:sampleBuffer]) {
-      [_methodChannel
-          invokeMethod:errorMethod
+    if (_videoWriterInput.readyForMoreMediaData) {
+        if (![_videoWriterInput appendSampleBuffer:sampleBuffer]) {
+            [_methodChannel
+             invokeMethod:errorMethod
              arguments:[NSString stringWithFormat:@"%@", @"Unable to write to video input"]];
+        }
     }
-  }
 }
 
 - (void)newAudioSample:(CMSampleBufferRef)sampleBuffer {
-  if (_videoWriter.status != AVAssetWriterStatusWriting) {
-    if (_videoWriter.status == AVAssetWriterStatusFailed) {
-      [_methodChannel invokeMethod:errorMethod
-                         arguments:[NSString stringWithFormat:@"%@", _videoWriter.error]];
+    if (_videoWriter.status != AVAssetWriterStatusWriting) {
+        if (_videoWriter.status == AVAssetWriterStatusFailed) {
+            [_methodChannel invokeMethod:errorMethod
+                               arguments:[NSString stringWithFormat:@"%@", _videoWriter.error]];
+        }
+        return;
     }
-    return;
-  }
-  if (_audioWriterInput.readyForMoreMediaData) {
-    if (![_audioWriterInput appendSampleBuffer:sampleBuffer]) {
-      [_methodChannel
-          invokeMethod:errorMethod
+    if (_audioWriterInput.readyForMoreMediaData) {
+        if (![_audioWriterInput appendSampleBuffer:sampleBuffer]) {
+            [_methodChannel
+             invokeMethod:errorMethod
              arguments:[NSString stringWithFormat:@"%@", @"Unable to write to audio input"]];
+        }
     }
-  }
 }
 
 - (void)close {
-  [_captureSession stopRunning];
-  for (AVCaptureInput *input in [_captureSession inputs]) {
-    [_captureSession removeInput:input];
-  }
-  for (AVCaptureOutput *output in [_captureSession outputs]) {
-    [_captureSession removeOutput:output];
-  }
+    [_captureSession stopRunning];
+    for (AVCaptureInput *input in [_captureSession inputs]) {
+        [_captureSession removeInput:input];
+    }
+    for (AVCaptureOutput *output in [_captureSession outputs]) {
+        [_captureSession removeOutput:output];
+    }
 }
 
 - (void)dealloc {
-  if (_latestPixelBuffer) {
-    CFRelease(_latestPixelBuffer);
-  }
-  [_motionManager stopAccelerometerUpdates];
+    if (_latestPixelBuffer) {
+        CFRelease(_latestPixelBuffer);
+    }
+    [_motionManager stopAccelerometerUpdates];
 }
 
 - (CVPixelBufferRef)copyPixelBuffer {
-  CVPixelBufferRef pixelBuffer = _latestPixelBuffer;
-  while (!OSAtomicCompareAndSwapPtrBarrier(pixelBuffer, nil, (void **)&_latestPixelBuffer)) {
-    pixelBuffer = _latestPixelBuffer;
-  }
-
-  return pixelBuffer;
+    CVPixelBufferRef pixelBuffer = _latestPixelBuffer;
+    while (!OSAtomicCompareAndSwapPtrBarrier(pixelBuffer, nil, (void **)&_latestPixelBuffer)) {
+        pixelBuffer = _latestPixelBuffer;
+    }
+    
+    return pixelBuffer;
 }
 
 - (void)startVideoRecordingWithResult:(FLTThreadSafeFlutterResult *)result {
-  if (!_isRecording) {
-    NSError *error;
-    _videoRecordingPath = [self getTemporaryFilePathWithExtension:@"mp4"
-                                                        subfolder:@"videos"
-                                                           prefix:@"REC_"
-                                                            error:error];
-    if (error) {
-      [result sendError:error];
-      return;
+    if (!_isRecording) {
+        NSError *error;
+        _videoRecordingPath = [self getTemporaryFilePathWithExtension:@"mp4"
+                                                            subfolder:@"videos"
+                                                               prefix:@"REC_"
+                                                                error:error];
+        if (error) {
+            [result sendError:error];
+            return;
+        }
+        if (![self setupWriterForPath:_videoRecordingPath]) {
+            [result sendErrorWithCode:@"IOError" message:@"Setup Writer Failed" details:nil];
+            return;
+        }
+        _isRecording = YES;
+        _isRecordingPaused = NO;
+        _videoTimeOffset = CMTimeMake(0, 1);
+        _audioTimeOffset = CMTimeMake(0, 1);
+        _videoIsDisconnected = NO;
+        _audioIsDisconnected = NO;
+        [result sendSuccess];
+    } else {
+        [result sendErrorWithCode:@"Error" message:@"Video is already recording" details:nil];
     }
-    if (![self setupWriterForPath:_videoRecordingPath]) {
-      [result sendErrorWithCode:@"IOError" message:@"Setup Writer Failed" details:nil];
-      return;
-    }
-    _isRecording = YES;
-    _isRecordingPaused = NO;
-    _videoTimeOffset = CMTimeMake(0, 1);
-    _audioTimeOffset = CMTimeMake(0, 1);
-    _videoIsDisconnected = NO;
-    _audioIsDisconnected = NO;
-    [result sendSuccess];
-  } else {
-    [result sendErrorWithCode:@"Error" message:@"Video is already recording" details:nil];
-  }
 }
 
 - (void)stopVideoRecordingWithResult:(FLTThreadSafeFlutterResult *)result {
-  if (_isRecording) {
-    _isRecording = NO;
-
-    if (_videoWriter.status != AVAssetWriterStatusUnknown) {
-      [_videoWriter finishWritingWithCompletionHandler:^{
-        if (self->_videoWriter.status == AVAssetWriterStatusCompleted) {
-          [self updateOrientation];
-          [result sendSuccessWithData:self->_videoRecordingPath];
-          self->_videoRecordingPath = nil;
-        } else {
-          [result sendErrorWithCode:@"IOError"
-                            message:@"AVAssetWriter could not finish writing!"
-                            details:nil];
+    if (_isRecording) {
+        _isRecording = NO;
+        
+        if (_videoWriter.status != AVAssetWriterStatusUnknown) {
+            [_videoWriter finishWritingWithCompletionHandler:^{
+                if (self->_videoWriter.status == AVAssetWriterStatusCompleted) {
+                    [self updateOrientation];
+                    [result sendSuccessWithData:self->_videoRecordingPath];
+                    self->_videoRecordingPath = nil;
+                } else {
+                    [result sendErrorWithCode:@"IOError"
+                                      message:@"AVAssetWriter could not finish writing!"
+                                      details:nil];
+                }
+            }];
         }
-      }];
-    }
-  } else {
-    NSError *error =
+    } else {
+        NSError *error =
         [NSError errorWithDomain:NSCocoaErrorDomain
                             code:NSURLErrorResourceUnavailable
                         userInfo:@{NSLocalizedDescriptionKey : @"Video is not recording!"}];
-    [result sendError:error];
-  }
+        [result sendError:error];
+    }
 }
 
 - (void)pauseVideoRecordingWithResult:(FLTThreadSafeFlutterResult *)result {
-  _isRecordingPaused = YES;
-  _videoIsDisconnected = YES;
-  _audioIsDisconnected = YES;
-  [result sendSuccess];
+    _isRecordingPaused = YES;
+    _videoIsDisconnected = YES;
+    _audioIsDisconnected = YES;
+    [result sendSuccess];
 }
 
 - (void)resumeVideoRecordingWithResult:(FLTThreadSafeFlutterResult *)result {
-  _isRecordingPaused = NO;
-  [result sendSuccess];
+    _isRecordingPaused = NO;
+    [result sendSuccess];
 }
 
 - (void)lockCaptureOrientationWithResult:(FLTThreadSafeFlutterResult *)result
                              orientation:(NSString *)orientationStr {
-  UIDeviceOrientation orientation;
-  @try {
-    orientation = getUIDeviceOrientationForString(orientationStr);
-  } @catch (NSError *e) {
-    [result sendError:e];
-    return;
-  }
-
-  if (_lockedCaptureOrientation != orientation) {
-    _lockedCaptureOrientation = orientation;
-    [self updateOrientation];
-  }
-
-  [result sendSuccess];
+    UIDeviceOrientation orientation;
+    @try {
+        orientation = getUIDeviceOrientationForString(orientationStr);
+    } @catch (NSError *e) {
+        [result sendError:e];
+        return;
+    }
+    
+    if (_lockedCaptureOrientation != orientation) {
+        _lockedCaptureOrientation = orientation;
+        [self updateOrientation];
+    }
+    
+    [result sendSuccess];
 }
 
 - (void)unlockCaptureOrientationWithResult:(FLTThreadSafeFlutterResult *)result {
-  _lockedCaptureOrientation = UIDeviceOrientationUnknown;
-  [self updateOrientation];
-  [result sendSuccess];
+    _lockedCaptureOrientation = UIDeviceOrientationUnknown;
+    [self updateOrientation];
+    [result sendSuccess];
 }
 
 - (void)setFlashModeWithResult:(FLTThreadSafeFlutterResult *)result mode:(NSString *)modeStr {
-  FlashMode mode;
-  @try {
-    mode = getFlashModeForString(modeStr);
-  } @catch (NSError *e) {
-    [result sendError:e];
-    return;
-  }
-  if (mode == FlashModeTorch) {
-    if (!_captureDevice.hasTorch) {
-      [result sendErrorWithCode:@"setFlashModeFailed"
-                        message:@"Device does not support torch mode"
-                        details:nil];
-      return;
+    FlashMode mode;
+    @try {
+        mode = getFlashModeForString(modeStr);
+    } @catch (NSError *e) {
+        [result sendError:e];
+        return;
     }
-    if (!_captureDevice.isTorchAvailable) {
-      [result sendErrorWithCode:@"setFlashModeFailed"
-                        message:@"Torch mode is currently not available"
-                        details:nil];
-      return;
+    if (mode == FlashModeTorch) {
+        if (!_captureDevice.hasTorch) {
+            [result sendErrorWithCode:@"setFlashModeFailed"
+                              message:@"Device does not support torch mode"
+                              details:nil];
+            return;
+        }
+        if (!_captureDevice.isTorchAvailable) {
+            [result sendErrorWithCode:@"setFlashModeFailed"
+                              message:@"Torch mode is currently not available"
+                              details:nil];
+            return;
+        }
+        if (_captureDevice.torchMode != AVCaptureTorchModeOn) {
+            [_captureDevice lockForConfiguration:nil];
+            [_captureDevice setTorchMode:AVCaptureTorchModeOn];
+            [_captureDevice unlockForConfiguration];
+        }
+    } else {
+        if (!_captureDevice.hasFlash) {
+            [result sendErrorWithCode:@"setFlashModeFailed"
+                              message:@"Device does not have flash capabilities"
+                              details:nil];
+            return;
+        }
+        AVCaptureFlashMode avFlashMode = getAVCaptureFlashModeForFlashMode(mode);
+        if (![_capturePhotoOutput.supportedFlashModes
+              containsObject:[NSNumber numberWithInt:((int)avFlashMode)]]) {
+            [result sendErrorWithCode:@"setFlashModeFailed"
+                              message:@"Device does not support this specific flash mode"
+                              details:nil];
+            return;
+        }
+        if (_captureDevice.torchMode != AVCaptureTorchModeOff) {
+            [_captureDevice lockForConfiguration:nil];
+            [_captureDevice setTorchMode:AVCaptureTorchModeOff];
+            [_captureDevice unlockForConfiguration];
+        }
     }
-    if (_captureDevice.torchMode != AVCaptureTorchModeOn) {
-      [_captureDevice lockForConfiguration:nil];
-      [_captureDevice setTorchMode:AVCaptureTorchModeOn];
-      [_captureDevice unlockForConfiguration];
-    }
-  } else {
-    if (!_captureDevice.hasFlash) {
-      [result sendErrorWithCode:@"setFlashModeFailed"
-                        message:@"Device does not have flash capabilities"
-                        details:nil];
-      return;
-    }
-    AVCaptureFlashMode avFlashMode = getAVCaptureFlashModeForFlashMode(mode);
-    if (![_capturePhotoOutput.supportedFlashModes
-            containsObject:[NSNumber numberWithInt:((int)avFlashMode)]]) {
-      [result sendErrorWithCode:@"setFlashModeFailed"
-                        message:@"Device does not support this specific flash mode"
-                        details:nil];
-      return;
-    }
-    if (_captureDevice.torchMode != AVCaptureTorchModeOff) {
-      [_captureDevice lockForConfiguration:nil];
-      [_captureDevice setTorchMode:AVCaptureTorchModeOff];
-      [_captureDevice unlockForConfiguration];
-    }
-  }
-  _flashMode = mode;
-  [result sendSuccess];
+    _flashMode = mode;
+    [result sendSuccess];
 }
 
 - (void)setExposureModeWithResult:(FLTThreadSafeFlutterResult *)result mode:(NSString *)modeStr {
-  ExposureMode mode;
-  @try {
-    mode = getExposureModeForString(modeStr);
-  } @catch (NSError *e) {
-    [result sendError:e];
-    return;
-  }
-  _exposureMode = mode;
-  [self applyExposureMode];
-  [result sendSuccess];
+    ExposureMode mode;
+    @try {
+        mode = getExposureModeForString(modeStr);
+    } @catch (NSError *e) {
+        [result sendError:e];
+        return;
+    }
+    _exposureMode = mode;
+    [self applyExposureMode];
+    [result sendSuccess];
 }
 
 - (void)applyExposureMode {
-  [_captureDevice lockForConfiguration:nil];
-  switch (_exposureMode) {
-    case ExposureModeLocked:
-      [_captureDevice setExposureMode:AVCaptureExposureModeAutoExpose];
-      break;
-    case ExposureModeAuto:
-      if ([_captureDevice isExposureModeSupported:AVCaptureExposureModeContinuousAutoExposure]) {
-        [_captureDevice setExposureMode:AVCaptureExposureModeContinuousAutoExposure];
-      } else {
-        [_captureDevice setExposureMode:AVCaptureExposureModeAutoExpose];
-      }
-      break;
-  }
-  [_captureDevice unlockForConfiguration];
+    [_captureDevice lockForConfiguration:nil];
+    switch (_exposureMode) {
+        case ExposureModeLocked:
+            [_captureDevice setExposureMode:AVCaptureExposureModeAutoExpose];
+            break;
+        case ExposureModeAuto:
+            if ([_captureDevice isExposureModeSupported:AVCaptureExposureModeContinuousAutoExposure]) {
+                [_captureDevice setExposureMode:AVCaptureExposureModeContinuousAutoExposure];
+            } else {
+                [_captureDevice setExposureMode:AVCaptureExposureModeAutoExpose];
+            }
+            break;
+    }
+    [_captureDevice unlockForConfiguration];
 }
 
 - (void)setFocusModeWithResult:(FLTThreadSafeFlutterResult *)result mode:(NSString *)modeStr {
-  FocusMode mode;
-  @try {
-    mode = getFocusModeForString(modeStr);
-  } @catch (NSError *e) {
-    [result sendError:e];
-    return;
-  }
-  _focusMode = mode;
-  [self applyFocusMode];
-  [result sendSuccess];
+    FocusMode mode;
+    @try {
+        mode = getFocusModeForString(modeStr);
+    } @catch (NSError *e) {
+        [result sendError:e];
+        return;
+    }
+    _focusMode = mode;
+    [self applyFocusMode];
+    [result sendSuccess];
 }
 
 - (void)applyFocusMode {
-  [self applyFocusMode:_focusMode onDevice:_captureDevice];
+    [self applyFocusMode:_focusMode onDevice:_captureDevice];
 }
 
 /**
@@ -1013,274 +1239,274 @@ NSString *const errorMethod = @"error";
  * @param captureDevice The AVCaptureDevice to which the @focusMode will be applied.
  */
 - (void)applyFocusMode:(FocusMode)focusMode onDevice:(AVCaptureDevice *)captureDevice {
-  [captureDevice lockForConfiguration:nil];
-  switch (focusMode) {
-    case FocusModeLocked:
-      if ([captureDevice isFocusModeSupported:AVCaptureFocusModeAutoFocus]) {
-        [captureDevice setFocusMode:AVCaptureFocusModeAutoFocus];
-      }
-      break;
-    case FocusModeAuto:
-      if ([captureDevice isFocusModeSupported:AVCaptureFocusModeContinuousAutoFocus]) {
-        [captureDevice setFocusMode:AVCaptureFocusModeContinuousAutoFocus];
-      } else if ([captureDevice isFocusModeSupported:AVCaptureFocusModeAutoFocus]) {
-        [captureDevice setFocusMode:AVCaptureFocusModeAutoFocus];
-      }
-      break;
-  }
-  [captureDevice unlockForConfiguration];
+    [captureDevice lockForConfiguration:nil];
+    switch (focusMode) {
+        case FocusModeLocked:
+            if ([captureDevice isFocusModeSupported:AVCaptureFocusModeAutoFocus]) {
+                [captureDevice setFocusMode:AVCaptureFocusModeAutoFocus];
+            }
+            break;
+        case FocusModeAuto:
+            if ([captureDevice isFocusModeSupported:AVCaptureFocusModeContinuousAutoFocus]) {
+                [captureDevice setFocusMode:AVCaptureFocusModeContinuousAutoFocus];
+            } else if ([captureDevice isFocusModeSupported:AVCaptureFocusModeAutoFocus]) {
+                [captureDevice setFocusMode:AVCaptureFocusModeAutoFocus];
+            }
+            break;
+    }
+    [captureDevice unlockForConfiguration];
 }
 
 - (void)pausePreviewWithResult:(FLTThreadSafeFlutterResult *)result {
-  _isPreviewPaused = true;
-  [result sendSuccess];
+    _isPreviewPaused = true;
+    [result sendSuccess];
 }
 
 - (void)resumePreviewWithResult:(FLTThreadSafeFlutterResult *)result {
-  _isPreviewPaused = false;
-  [result sendSuccess];
+    _isPreviewPaused = false;
+    [result sendSuccess];
 }
 
 - (CGPoint)getCGPointForCoordsWithOrientation:(UIDeviceOrientation)orientation
                                             x:(double)x
                                             y:(double)y {
-  double oldX = x, oldY = y;
-  switch (orientation) {
-    case UIDeviceOrientationPortrait:  // 90 ccw
-      y = 1 - oldX;
-      x = oldY;
-      break;
-    case UIDeviceOrientationPortraitUpsideDown:  // 90 cw
-      x = 1 - oldY;
-      y = oldX;
-      break;
-    case UIDeviceOrientationLandscapeRight:  // 180
-      x = 1 - x;
-      y = 1 - y;
-      break;
-    case UIDeviceOrientationLandscapeLeft:
-    default:
-      // No rotation required
-      break;
-  }
-  return CGPointMake(x, y);
+    double oldX = x, oldY = y;
+    switch (orientation) {
+        case UIDeviceOrientationPortrait:  // 90 ccw
+            y = 1 - oldX;
+            x = oldY;
+            break;
+        case UIDeviceOrientationPortraitUpsideDown:  // 90 cw
+            x = 1 - oldY;
+            y = oldX;
+            break;
+        case UIDeviceOrientationLandscapeRight:  // 180
+            x = 1 - x;
+            y = 1 - y;
+            break;
+        case UIDeviceOrientationLandscapeLeft:
+        default:
+            // No rotation required
+            break;
+    }
+    return CGPointMake(x, y);
 }
 
 - (void)setExposurePointWithResult:(FLTThreadSafeFlutterResult *)result x:(double)x y:(double)y {
-  if (!_captureDevice.isExposurePointOfInterestSupported) {
-    [result sendErrorWithCode:@"setExposurePointFailed"
-                      message:@"Device does not have exposure point capabilities"
-                      details:nil];
-    return;
-  }
-  UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
-  [_captureDevice lockForConfiguration:nil];
-  [_captureDevice setExposurePointOfInterest:[self getCGPointForCoordsWithOrientation:orientation
-                                                                                    x:x
-                                                                                    y:y]];
-  [_captureDevice unlockForConfiguration];
-  // Retrigger auto exposure
-  [self applyExposureMode];
-  [result sendSuccess];
+    if (!_captureDevice.isExposurePointOfInterestSupported) {
+        [result sendErrorWithCode:@"setExposurePointFailed"
+                          message:@"Device does not have exposure point capabilities"
+                          details:nil];
+        return;
+    }
+    UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
+    [_captureDevice lockForConfiguration:nil];
+    [_captureDevice setExposurePointOfInterest:[self getCGPointForCoordsWithOrientation:orientation
+                                                                                      x:x
+                                                                                      y:y]];
+    [_captureDevice unlockForConfiguration];
+    // Retrigger auto exposure
+    [self applyExposureMode];
+    [result sendSuccess];
 }
 
 - (void)setFocusPointWithResult:(FLTThreadSafeFlutterResult *)result x:(double)x y:(double)y {
-  if (!_captureDevice.isFocusPointOfInterestSupported) {
-    [result sendErrorWithCode:@"setFocusPointFailed"
-                      message:@"Device does not have focus point capabilities"
-                      details:nil];
-    return;
-  }
-  UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
-  [_captureDevice lockForConfiguration:nil];
-
-  [_captureDevice setFocusPointOfInterest:[self getCGPointForCoordsWithOrientation:orientation
-                                                                                 x:x
-                                                                                 y:y]];
-  [_captureDevice unlockForConfiguration];
-  // Retrigger auto focus
-  [self applyFocusMode];
-  [result sendSuccess];
+    if (!_captureDevice.isFocusPointOfInterestSupported) {
+        [result sendErrorWithCode:@"setFocusPointFailed"
+                          message:@"Device does not have focus point capabilities"
+                          details:nil];
+        return;
+    }
+    UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
+    [_captureDevice lockForConfiguration:nil];
+    
+    [_captureDevice setFocusPointOfInterest:[self getCGPointForCoordsWithOrientation:orientation
+                                                                                   x:x
+                                                                                   y:y]];
+    [_captureDevice unlockForConfiguration];
+    // Retrigger auto focus
+    [self applyFocusMode];
+    [result sendSuccess];
 }
 
 - (void)setExposureOffsetWithResult:(FLTThreadSafeFlutterResult *)result offset:(double)offset {
-  [_captureDevice lockForConfiguration:nil];
-  [_captureDevice setExposureTargetBias:offset completionHandler:nil];
-  [_captureDevice unlockForConfiguration];
-  [result sendSuccessWithData:@(offset)];
+    [_captureDevice lockForConfiguration:nil];
+    [_captureDevice setExposureTargetBias:offset completionHandler:nil];
+    [_captureDevice unlockForConfiguration];
+    [result sendSuccessWithData:@(offset)];
 }
 
 - (void)startImageStreamWithMessenger:(NSObject<FlutterBinaryMessenger> *)messenger {
-  if (!_isStreamingImages) {
-    FlutterEventChannel *eventChannel =
+    if (!_isStreamingImages) {
+        FlutterEventChannel *eventChannel =
         [FlutterEventChannel eventChannelWithName:@"plugins.flutter.io/camera/imageStream"
                                   binaryMessenger:messenger];
-
-    _imageStreamHandler = [[FLTImageStreamHandler alloc] init];
-    [eventChannel setStreamHandler:_imageStreamHandler];
-
-    _isStreamingImages = YES;
-  } else {
-    [_methodChannel invokeMethod:errorMethod
-                       arguments:@"Images from camera are already streaming!"];
-  }
+        
+        _imageStreamHandler = [[FLTImageStreamHandler alloc] init];
+        [eventChannel setStreamHandler:_imageStreamHandler];
+        
+        _isStreamingImages = YES;
+    } else {
+        [_methodChannel invokeMethod:errorMethod
+                           arguments:@"Images from camera are already streaming!"];
+    }
 }
 
 - (void)stopImageStream {
-  if (_isStreamingImages) {
-    _isStreamingImages = NO;
-    _imageStreamHandler = nil;
-  } else {
-    [_methodChannel invokeMethod:errorMethod arguments:@"Images from camera are not streaming!"];
-  }
+    if (_isStreamingImages) {
+        _isStreamingImages = NO;
+        _imageStreamHandler = nil;
+    } else {
+        [_methodChannel invokeMethod:errorMethod arguments:@"Images from camera are not streaming!"];
+    }
 }
 
 - (void)getMaxZoomLevelWithResult:(FLTThreadSafeFlutterResult *)result {
-  CGFloat maxZoomFactor = [self getMaxAvailableZoomFactor];
-
-  [result sendSuccessWithData:[NSNumber numberWithFloat:maxZoomFactor]];
+    CGFloat maxZoomFactor = [self getMaxAvailableZoomFactor];
+    
+    [result sendSuccessWithData:[NSNumber numberWithFloat:maxZoomFactor]];
 }
 
 - (void)getMinZoomLevelWithResult:(FLTThreadSafeFlutterResult *)result {
-  CGFloat minZoomFactor = [self getMinAvailableZoomFactor];
-  [result sendSuccessWithData:[NSNumber numberWithFloat:minZoomFactor]];
+    CGFloat minZoomFactor = [self getMinAvailableZoomFactor];
+    [result sendSuccessWithData:[NSNumber numberWithFloat:minZoomFactor]];
 }
 
 - (void)setZoomLevel:(CGFloat)zoom Result:(FLTThreadSafeFlutterResult *)result {
-  CGFloat maxAvailableZoomFactor = [self getMaxAvailableZoomFactor];
-  CGFloat minAvailableZoomFactor = [self getMinAvailableZoomFactor];
-
-  if (maxAvailableZoomFactor < zoom || minAvailableZoomFactor > zoom) {
-    NSString *errorMessage = [NSString
-        stringWithFormat:@"Zoom level out of bounds (zoom level should be between %f and %f).",
-                         minAvailableZoomFactor, maxAvailableZoomFactor];
-
-    [result sendErrorWithCode:@"ZOOM_ERROR" message:errorMessage details:nil];
-    return;
-  }
-
-  NSError *error = nil;
-  if (![_captureDevice lockForConfiguration:&error]) {
-    [result sendError:error];
-    return;
-  }
-  _captureDevice.videoZoomFactor = zoom;
-  [_captureDevice unlockForConfiguration];
-
-  [result sendSuccess];
+    CGFloat maxAvailableZoomFactor = [self getMaxAvailableZoomFactor];
+    CGFloat minAvailableZoomFactor = [self getMinAvailableZoomFactor];
+    
+    if (maxAvailableZoomFactor < zoom || minAvailableZoomFactor > zoom) {
+        NSString *errorMessage = [NSString
+                                  stringWithFormat:@"Zoom level out of bounds (zoom level should be between %f and %f).",
+                                  minAvailableZoomFactor, maxAvailableZoomFactor];
+        
+        [result sendErrorWithCode:@"ZOOM_ERROR" message:errorMessage details:nil];
+        return;
+    }
+    
+    NSError *error = nil;
+    if (![_captureDevice lockForConfiguration:&error]) {
+        [result sendError:error];
+        return;
+    }
+    _captureDevice.videoZoomFactor = zoom;
+    [_captureDevice unlockForConfiguration];
+    
+    [result sendSuccess];
 }
 
 - (CGFloat)getMinAvailableZoomFactor {
-  if (@available(iOS 11.0, *)) {
-    return _captureDevice.minAvailableVideoZoomFactor;
-  } else {
-    return 1.0;
-  }
+    if (@available(iOS 11.0, *)) {
+        return _captureDevice.minAvailableVideoZoomFactor;
+    } else {
+        return 1.0;
+    }
 }
 
 - (CGFloat)getMaxAvailableZoomFactor {
-  if (@available(iOS 11.0, *)) {
-    return _captureDevice.maxAvailableVideoZoomFactor;
-  } else {
-    return _captureDevice.activeFormat.videoMaxZoomFactor;
-  }
+    if (@available(iOS 11.0, *)) {
+        return _captureDevice.maxAvailableVideoZoomFactor;
+    } else {
+        return _captureDevice.activeFormat.videoMaxZoomFactor;
+    }
 }
 
 - (BOOL)setupWriterForPath:(NSString *)path {
-  NSError *error = nil;
-  NSURL *outputURL;
-  if (path != nil) {
-    outputURL = [NSURL fileURLWithPath:path];
-  } else {
-    return NO;
-  }
-  if (_enableAudio && !_isAudioSetup) {
-    [self setUpCaptureSessionForAudio];
-  }
-
-  _videoWriter = [[AVAssetWriter alloc] initWithURL:outputURL
-                                           fileType:AVFileTypeMPEG4
-                                              error:&error];
-  NSParameterAssert(_videoWriter);
-  if (error) {
-    [_methodChannel invokeMethod:errorMethod arguments:error.description];
-    return NO;
-  }
-
-  NSDictionary *videoSettings = [_captureVideoOutput
-      recommendedVideoSettingsForAssetWriterWithOutputFileType:AVFileTypeMPEG4];
-  _videoWriterInput = [AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeVideo
-                                                         outputSettings:videoSettings];
-
-  _videoAdaptor = [AVAssetWriterInputPixelBufferAdaptor
-      assetWriterInputPixelBufferAdaptorWithAssetWriterInput:_videoWriterInput
-                                 sourcePixelBufferAttributes:@{
-                                   (NSString *)kCVPixelBufferPixelFormatTypeKey : @(videoFormat)
-                                 }];
-
-  NSParameterAssert(_videoWriterInput);
-
-  _videoWriterInput.expectsMediaDataInRealTime = YES;
-
-  // Add the audio input
-  if (_enableAudio) {
-    AudioChannelLayout acl;
-    bzero(&acl, sizeof(acl));
-    acl.mChannelLayoutTag = kAudioChannelLayoutTag_Mono;
-    NSDictionary *audioOutputSettings = nil;
-    // Both type of audio inputs causes output video file to be corrupted.
-    audioOutputSettings = @{
-      AVFormatIDKey : [NSNumber numberWithInt:kAudioFormatMPEG4AAC],
-      AVSampleRateKey : [NSNumber numberWithFloat:44100.0],
-      AVNumberOfChannelsKey : [NSNumber numberWithInt:1],
-      AVChannelLayoutKey : [NSData dataWithBytes:&acl length:sizeof(acl)],
-    };
-    _audioWriterInput = [AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeAudio
-                                                           outputSettings:audioOutputSettings];
-    _audioWriterInput.expectsMediaDataInRealTime = YES;
-
-    [_videoWriter addInput:_audioWriterInput];
-    [_audioOutput setSampleBufferDelegate:self queue:_dispatchQueue];
-  }
-
-  if (_flashMode == FlashModeTorch) {
-    [self.captureDevice lockForConfiguration:nil];
-    [self.captureDevice setTorchMode:AVCaptureTorchModeOn];
-    [self.captureDevice unlockForConfiguration];
-  }
-
-  [_videoWriter addInput:_videoWriterInput];
-
-  [_captureVideoOutput setSampleBufferDelegate:self queue:_dispatchQueue];
-
-  return YES;
+    NSError *error = nil;
+    NSURL *outputURL;
+    if (path != nil) {
+        outputURL = [NSURL fileURLWithPath:path];
+    } else {
+        return NO;
+    }
+    if (_enableAudio && !_isAudioSetup) {
+        [self setUpCaptureSessionForAudio];
+    }
+    
+    _videoWriter = [[AVAssetWriter alloc] initWithURL:outputURL
+                                             fileType:AVFileTypeMPEG4
+                                                error:&error];
+    NSParameterAssert(_videoWriter);
+    if (error) {
+        [_methodChannel invokeMethod:errorMethod arguments:error.description];
+        return NO;
+    }
+    
+    NSDictionary *videoSettings = [_captureVideoOutput
+                                   recommendedVideoSettingsForAssetWriterWithOutputFileType:AVFileTypeMPEG4];
+    _videoWriterInput = [AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeVideo
+                                                           outputSettings:videoSettings];
+    
+    _videoAdaptor = [AVAssetWriterInputPixelBufferAdaptor
+                     assetWriterInputPixelBufferAdaptorWithAssetWriterInput:_videoWriterInput
+                     sourcePixelBufferAttributes:@{
+        (NSString *)kCVPixelBufferPixelFormatTypeKey : @(videoFormat)
+    }];
+    
+    NSParameterAssert(_videoWriterInput);
+    
+    _videoWriterInput.expectsMediaDataInRealTime = YES;
+    
+    // Add the audio input
+    if (_enableAudio) {
+        AudioChannelLayout acl;
+        bzero(&acl, sizeof(acl));
+        acl.mChannelLayoutTag = kAudioChannelLayoutTag_Mono;
+        NSDictionary *audioOutputSettings = nil;
+        // Both type of audio inputs causes output video file to be corrupted.
+        audioOutputSettings = @{
+            AVFormatIDKey : [NSNumber numberWithInt:kAudioFormatMPEG4AAC],
+            AVSampleRateKey : [NSNumber numberWithFloat:44100.0],
+            AVNumberOfChannelsKey : [NSNumber numberWithInt:1],
+            AVChannelLayoutKey : [NSData dataWithBytes:&acl length:sizeof(acl)],
+        };
+        _audioWriterInput = [AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeAudio
+                                                               outputSettings:audioOutputSettings];
+        _audioWriterInput.expectsMediaDataInRealTime = YES;
+        
+        [_videoWriter addInput:_audioWriterInput];
+        [_audioOutput setSampleBufferDelegate:self queue:_dispatchQueue];
+    }
+    
+    if (_flashMode == FlashModeTorch) {
+        [self.captureDevice lockForConfiguration:nil];
+        [self.captureDevice setTorchMode:AVCaptureTorchModeOn];
+        [self.captureDevice unlockForConfiguration];
+    }
+    
+    [_videoWriter addInput:_videoWriterInput];
+    
+    [_captureVideoOutput setSampleBufferDelegate:self queue:_dispatchQueue];
+    
+    return YES;
 }
 
 - (void)setUpCaptureSessionForAudio {
-  NSError *error = nil;
-  // Create a device input with the device and add it to the session.
-  // Setup the audio input.
-  AVCaptureDevice *audioDevice = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
-  AVCaptureDeviceInput *audioInput = [AVCaptureDeviceInput deviceInputWithDevice:audioDevice
-                                                                           error:&error];
-  if (error) {
-    [_methodChannel invokeMethod:errorMethod arguments:error.description];
-  }
-  // Setup the audio output.
-  _audioOutput = [[AVCaptureAudioDataOutput alloc] init];
-
-  if ([_captureSession canAddInput:audioInput]) {
-    [_captureSession addInput:audioInput];
-
-    if ([_captureSession canAddOutput:_audioOutput]) {
-      [_captureSession addOutput:_audioOutput];
-      _isAudioSetup = YES;
-    } else {
-      [_methodChannel invokeMethod:errorMethod
-                         arguments:@"Unable to add Audio input/output to session capture"];
-      _isAudioSetup = NO;
+    NSError *error = nil;
+    // Create a device input with the device and add it to the session.
+    // Setup the audio input.
+    AVCaptureDevice *audioDevice = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
+    AVCaptureDeviceInput *audioInput = [AVCaptureDeviceInput deviceInputWithDevice:audioDevice
+                                                                             error:&error];
+    if (error) {
+        [_methodChannel invokeMethod:errorMethod arguments:error.description];
     }
-  }
+    // Setup the audio output.
+    _audioOutput = [[AVCaptureAudioDataOutput alloc] init];
+    
+    if ([_captureSession canAddInput:audioInput]) {
+        [_captureSession addInput:audioInput];
+        
+        if ([_captureSession canAddOutput:_audioOutput]) {
+            [_captureSession addOutput:_audioOutput];
+            _isAudioSetup = YES;
+        } else {
+            [_methodChannel invokeMethod:errorMethod
+                               arguments:@"Unable to add Audio input/output to session capture"];
+            _isAudioSetup = NO;
+        }
+    }
 }
 @end
 
@@ -1292,249 +1518,249 @@ NSString *const errorMethod = @"error";
 @end
 
 @implementation CameraPlugin {
-  dispatch_queue_t _dispatchQueue;
+    dispatch_queue_t _dispatchQueue;
 }
 
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar {
-  FlutterMethodChannel *channel =
-      [FlutterMethodChannel methodChannelWithName:@"plugins.flutter.io/camera"
-                                  binaryMessenger:[registrar messenger]];
-  CameraPlugin *instance = [[CameraPlugin alloc] initWithRegistry:[registrar textures]
-                                                        messenger:[registrar messenger]];
-  [registrar addMethodCallDelegate:instance channel:channel];
+    FlutterMethodChannel *channel =
+    [FlutterMethodChannel methodChannelWithName:@"plugins.flutter.io/camera"
+                                binaryMessenger:[registrar messenger]];
+    CameraPlugin *instance = [[CameraPlugin alloc] initWithRegistry:[registrar textures]
+                                                          messenger:[registrar messenger]];
+    [registrar addMethodCallDelegate:instance channel:channel];
 }
 
 - (instancetype)initWithRegistry:(NSObject<FlutterTextureRegistry> *)registry
                        messenger:(NSObject<FlutterBinaryMessenger> *)messenger {
-  self = [super init];
-  NSAssert(self, @"super init cannot be nil");
-  _registry = registry;
-  _messenger = messenger;
-  [self initDeviceEventMethodChannel];
-  [self startOrientationListener];
-  return self;
+    self = [super init];
+    NSAssert(self, @"super init cannot be nil");
+    _registry = registry;
+    _messenger = messenger;
+    [self initDeviceEventMethodChannel];
+    [self startOrientationListener];
+    return self;
 }
 
 - (void)initDeviceEventMethodChannel {
-  _deviceEventMethodChannel =
-      [FlutterMethodChannel methodChannelWithName:@"flutter.io/cameraPlugin/device"
-                                  binaryMessenger:_messenger];
+    _deviceEventMethodChannel =
+    [FlutterMethodChannel methodChannelWithName:@"flutter.io/cameraPlugin/device"
+                                binaryMessenger:_messenger];
 }
 
 - (void)startOrientationListener {
-  [[UIDevice currentDevice] beginGeneratingDeviceOrientationNotifications];
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(orientationChanged:)
-                                               name:UIDeviceOrientationDidChangeNotification
-                                             object:[UIDevice currentDevice]];
+    [[UIDevice currentDevice] beginGeneratingDeviceOrientationNotifications];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(orientationChanged:)
+                                                 name:UIDeviceOrientationDidChangeNotification
+                                               object:[UIDevice currentDevice]];
 }
 
 - (void)orientationChanged:(NSNotification *)note {
-  UIDevice *device = note.object;
-  UIDeviceOrientation orientation = device.orientation;
-
-  if (orientation == UIDeviceOrientationFaceUp || orientation == UIDeviceOrientationFaceDown) {
-    // Do not change when oriented flat.
-    return;
-  }
-
-  if (_camera) {
-    [_camera setDeviceOrientation:orientation];
-  }
-
-  [self sendDeviceOrientation:orientation];
+    UIDevice *device = note.object;
+    UIDeviceOrientation orientation = device.orientation;
+    
+    if (orientation == UIDeviceOrientationFaceUp || orientation == UIDeviceOrientationFaceDown) {
+        // Do not change when oriented flat.
+        return;
+    }
+    
+    if (_camera) {
+        [_camera setDeviceOrientation:orientation];
+    }
+    
+    [self sendDeviceOrientation:orientation];
 }
 
 - (void)sendDeviceOrientation:(UIDeviceOrientation)orientation {
-  [_deviceEventMethodChannel
-      invokeMethod:@"orientation_changed"
-         arguments:@{@"orientation" : getStringForUIDeviceOrientation(orientation)}];
+    [_deviceEventMethodChannel
+     invokeMethod:@"orientation_changed"
+     arguments:@{@"orientation" : getStringForUIDeviceOrientation(orientation)}];
 }
 
 - (void)handleMethodCall:(FlutterMethodCall *)call result:(FlutterResult)result {
-  if (_dispatchQueue == nil) {
-    _dispatchQueue = dispatch_queue_create("io.flutter.camera.dispatchqueue", NULL);
-  }
-
-  // Invoke the plugin on another dispatch queue to avoid blocking the UI.
-  dispatch_async(_dispatchQueue, ^{
-    FLTThreadSafeFlutterResult *threadSafeResult =
+    if (_dispatchQueue == nil) {
+        _dispatchQueue = dispatch_queue_create("io.flutter.camera.dispatchqueue", NULL);
+    }
+    
+    // Invoke the plugin on another dispatch queue to avoid blocking the UI.
+    dispatch_async(_dispatchQueue, ^{
+        FLTThreadSafeFlutterResult *threadSafeResult =
         [[FLTThreadSafeFlutterResult alloc] initWithResult:result];
-
-    [self handleMethodCallAsync:call result:threadSafeResult];
-  });
+        
+        [self handleMethodCallAsync:call result:threadSafeResult];
+    });
 }
 
 - (void)handleMethodCallAsync:(FlutterMethodCall *)call
                        result:(FLTThreadSafeFlutterResult *)result {
-  if ([@"availableCameras" isEqualToString:call.method]) {
-    if (@available(iOS 10.0, *)) {
-      AVCaptureDeviceDiscoverySession *discoverySession = [AVCaptureDeviceDiscoverySession
-          discoverySessionWithDeviceTypes:@[ AVCaptureDeviceTypeBuiltInWideAngleCamera ]
-                                mediaType:AVMediaTypeVideo
-                                 position:AVCaptureDevicePositionUnspecified];
-      NSArray<AVCaptureDevice *> *devices = discoverySession.devices;
-      NSMutableArray<NSDictionary<NSString *, NSObject *> *> *reply =
-          [[NSMutableArray alloc] initWithCapacity:devices.count];
-      for (AVCaptureDevice *device in devices) {
-        NSString *lensFacing;
-        switch ([device position]) {
-          case AVCaptureDevicePositionBack:
-            lensFacing = @"back";
-            break;
-          case AVCaptureDevicePositionFront:
-            lensFacing = @"front";
-            break;
-          case AVCaptureDevicePositionUnspecified:
-            lensFacing = @"external";
-            break;
+    if ([@"availableCameras" isEqualToString:call.method]) {
+        if (@available(iOS 10.0, *)) {
+            AVCaptureDeviceDiscoverySession *discoverySession = [AVCaptureDeviceDiscoverySession
+                                                                 discoverySessionWithDeviceTypes:@[ AVCaptureDeviceTypeBuiltInWideAngleCamera ]
+                                                                 mediaType:AVMediaTypeVideo
+                                                                 position:AVCaptureDevicePositionUnspecified];
+            NSArray<AVCaptureDevice *> *devices = discoverySession.devices;
+            NSMutableArray<NSDictionary<NSString *, NSObject *> *> *reply =
+            [[NSMutableArray alloc] initWithCapacity:devices.count];
+            for (AVCaptureDevice *device in devices) {
+                NSString *lensFacing;
+                switch ([device position]) {
+                    case AVCaptureDevicePositionBack:
+                        lensFacing = @"back";
+                        break;
+                    case AVCaptureDevicePositionFront:
+                        lensFacing = @"front";
+                        break;
+                    case AVCaptureDevicePositionUnspecified:
+                        lensFacing = @"external";
+                        break;
+                }
+                [reply addObject:@{
+                    @"name" : [device uniqueID],
+                    @"lensFacing" : lensFacing,
+                    @"sensorOrientation" : @90,
+                }];
+            }
+            [result sendSuccessWithData:reply];
+        } else {
+            [result sendNotImplemented];
         }
-        [reply addObject:@{
-          @"name" : [device uniqueID],
-          @"lensFacing" : lensFacing,
-          @"sensorOrientation" : @90,
-        }];
-      }
-      [result sendSuccessWithData:reply];
-    } else {
-      [result sendNotImplemented];
-    }
-  } else if ([@"create" isEqualToString:call.method]) {
-    NSString *cameraName = call.arguments[@"cameraName"];
-    NSString *resolutionPreset = call.arguments[@"resolutionPreset"];
-    NSNumber *enableAudio = call.arguments[@"enableAudio"];
-    NSError *error;
-    FLTCam *cam = [[FLTCam alloc] initWithCameraName:cameraName
-                                    resolutionPreset:resolutionPreset
-                                         enableAudio:[enableAudio boolValue]
-                                         orientation:[[UIDevice currentDevice] orientation]
-                                       dispatchQueue:_dispatchQueue
-                                               error:&error];
-
-    if (error) {
-      [result sendError:error];
-    } else {
-      if (_camera) {
-        [_camera close];
-      }
-      int64_t textureId = [self.registry registerTexture:cam];
-      _camera = cam;
-      [result sendSuccessWithData:@{
-        @"cameraId" : @(textureId),
-      }];
-    }
-  } else if ([@"startImageStream" isEqualToString:call.method]) {
-    [_camera startImageStreamWithMessenger:_messenger];
-    [result sendSuccess];
-  } else if ([@"stopImageStream" isEqualToString:call.method]) {
-    [_camera stopImageStream];
-    [result sendSuccess];
-  } else {
-    NSDictionary *argsMap = call.arguments;
-    NSUInteger cameraId = ((NSNumber *)argsMap[@"cameraId"]).unsignedIntegerValue;
-    if ([@"initialize" isEqualToString:call.method]) {
-      NSString *videoFormatValue = ((NSString *)argsMap[@"imageFormatGroup"]);
-      videoFormat = getVideoFormatFromString(videoFormatValue);
-
-      __weak CameraPlugin *weakSelf = self;
-      _camera.onFrameAvailable = ^{
-        if (![weakSelf.camera isPreviewPaused]) {
-          [weakSelf.registry textureFrameAvailable:cameraId];
+    } else if ([@"create" isEqualToString:call.method]) {
+        NSString *cameraName = call.arguments[@"cameraName"];
+        NSString *resolutionPreset = call.arguments[@"resolutionPreset"];
+        NSNumber *enableAudio = call.arguments[@"enableAudio"];
+        NSError *error;
+        FLTCam *cam = [[FLTCam alloc] initWithCameraName:cameraName
+                                        resolutionPreset:resolutionPreset
+                                             enableAudio:[enableAudio boolValue]
+                                             orientation:[[UIDevice currentDevice] orientation]
+                                           dispatchQueue:_dispatchQueue
+                                                   error:&error];
+        
+        if (error) {
+            [result sendError:error];
+        } else {
+            if (_camera) {
+                [_camera close];
+            }
+            int64_t textureId = [self.registry registerTexture:cam];
+            _camera = cam;
+            [result sendSuccessWithData:@{
+                @"cameraId" : @(textureId),
+            }];
         }
-      };
-      FlutterMethodChannel *methodChannel = [FlutterMethodChannel
-          methodChannelWithName:[NSString stringWithFormat:@"flutter.io/cameraPlugin/camera%lu",
-                                                           (unsigned long)cameraId]
-                binaryMessenger:_messenger];
-      _camera.methodChannel = methodChannel;
-      [methodChannel
-          invokeMethod:@"initialized"
+    } else if ([@"startImageStream" isEqualToString:call.method]) {
+        [_camera startImageStreamWithMessenger:_messenger];
+        [result sendSuccess];
+    } else if ([@"stopImageStream" isEqualToString:call.method]) {
+        [_camera stopImageStream];
+        [result sendSuccess];
+    } else {
+        NSDictionary *argsMap = call.arguments;
+        NSUInteger cameraId = ((NSNumber *)argsMap[@"cameraId"]).unsignedIntegerValue;
+        if ([@"initialize" isEqualToString:call.method]) {
+            NSString *videoFormatValue = ((NSString *)argsMap[@"imageFormatGroup"]);
+            videoFormat = getVideoFormatFromString(videoFormatValue);
+            
+            __weak CameraPlugin *weakSelf = self;
+            _camera.onFrameAvailable = ^{
+                if (![weakSelf.camera isPreviewPaused]) {
+                    [weakSelf.registry textureFrameAvailable:cameraId];
+                }
+            };
+            FlutterMethodChannel *methodChannel = [FlutterMethodChannel
+                                                   methodChannelWithName:[NSString stringWithFormat:@"flutter.io/cameraPlugin/camera%lu",
+                                                                          (unsigned long)cameraId]
+                                                   binaryMessenger:_messenger];
+            _camera.methodChannel = methodChannel;
+            [methodChannel
+             invokeMethod:@"initialized"
              arguments:@{
-               @"previewWidth" : @(_camera.previewSize.width),
-               @"previewHeight" : @(_camera.previewSize.height),
-               @"exposureMode" : getStringForExposureMode([_camera exposureMode]),
-               @"focusMode" : getStringForFocusMode([_camera focusMode]),
-               @"exposurePointSupported" :
-                   @([_camera.captureDevice isExposurePointOfInterestSupported]),
-               @"focusPointSupported" : @([_camera.captureDevice isFocusPointOfInterestSupported]),
-             }];
-      [self sendDeviceOrientation:[UIDevice currentDevice].orientation];
-      [_camera start];
-      [result sendSuccess];
-    } else if ([@"takePicture" isEqualToString:call.method]) {
-      if (@available(iOS 10.0, *)) {
-        [_camera captureToFile:result];
-      } else {
-        [result sendNotImplemented];
-      }
-    } else if ([@"dispose" isEqualToString:call.method]) {
-      [_registry unregisterTexture:cameraId];
-      [_camera close];
-      _dispatchQueue = nil;
-      [result sendSuccess];
-    } else if ([@"prepareForVideoRecording" isEqualToString:call.method]) {
-      [_camera setUpCaptureSessionForAudio];
-      [result sendSuccess];
-    } else if ([@"startVideoRecording" isEqualToString:call.method]) {
-      [_camera startVideoRecordingWithResult:result];
-    } else if ([@"stopVideoRecording" isEqualToString:call.method]) {
-      [_camera stopVideoRecordingWithResult:result];
-    } else if ([@"pauseVideoRecording" isEqualToString:call.method]) {
-      [_camera pauseVideoRecordingWithResult:result];
-    } else if ([@"resumeVideoRecording" isEqualToString:call.method]) {
-      [_camera resumeVideoRecordingWithResult:result];
-    } else if ([@"getMaxZoomLevel" isEqualToString:call.method]) {
-      [_camera getMaxZoomLevelWithResult:result];
-    } else if ([@"getMinZoomLevel" isEqualToString:call.method]) {
-      [_camera getMinZoomLevelWithResult:result];
-    } else if ([@"setZoomLevel" isEqualToString:call.method]) {
-      CGFloat zoom = ((NSNumber *)argsMap[@"zoom"]).floatValue;
-      [_camera setZoomLevel:zoom Result:result];
-    } else if ([@"setFlashMode" isEqualToString:call.method]) {
-      [_camera setFlashModeWithResult:result mode:call.arguments[@"mode"]];
-    } else if ([@"setExposureMode" isEqualToString:call.method]) {
-      [_camera setExposureModeWithResult:result mode:call.arguments[@"mode"]];
-    } else if ([@"setExposurePoint" isEqualToString:call.method]) {
-      BOOL reset = ((NSNumber *)call.arguments[@"reset"]).boolValue;
-      double x = 0.5;
-      double y = 0.5;
-      if (!reset) {
-        x = ((NSNumber *)call.arguments[@"x"]).doubleValue;
-        y = ((NSNumber *)call.arguments[@"y"]).doubleValue;
-      }
-      [_camera setExposurePointWithResult:result x:x y:y];
-    } else if ([@"getMinExposureOffset" isEqualToString:call.method]) {
-      [result sendSuccessWithData:@(_camera.captureDevice.minExposureTargetBias)];
-    } else if ([@"getMaxExposureOffset" isEqualToString:call.method]) {
-      [result sendSuccessWithData:@(_camera.captureDevice.maxExposureTargetBias)];
-    } else if ([@"getExposureOffsetStepSize" isEqualToString:call.method]) {
-      [result sendSuccessWithData:@(0.0)];
-    } else if ([@"setExposureOffset" isEqualToString:call.method]) {
-      [_camera setExposureOffsetWithResult:result
-                                    offset:((NSNumber *)call.arguments[@"offset"]).doubleValue];
-    } else if ([@"lockCaptureOrientation" isEqualToString:call.method]) {
-      [_camera lockCaptureOrientationWithResult:result orientation:call.arguments[@"orientation"]];
-    } else if ([@"unlockCaptureOrientation" isEqualToString:call.method]) {
-      [_camera unlockCaptureOrientationWithResult:result];
-    } else if ([@"setFocusMode" isEqualToString:call.method]) {
-      [_camera setFocusModeWithResult:result mode:call.arguments[@"mode"]];
-    } else if ([@"setFocusPoint" isEqualToString:call.method]) {
-      BOOL reset = ((NSNumber *)call.arguments[@"reset"]).boolValue;
-      double x = 0.5;
-      double y = 0.5;
-      if (!reset) {
-        x = ((NSNumber *)call.arguments[@"x"]).doubleValue;
-        y = ((NSNumber *)call.arguments[@"y"]).doubleValue;
-      }
-      [_camera setFocusPointWithResult:result x:x y:y];
-    } else if ([@"pausePreview" isEqualToString:call.method]) {
-      [_camera pausePreviewWithResult:result];
-    } else if ([@"resumePreview" isEqualToString:call.method]) {
-      [_camera resumePreviewWithResult:result];
-    } else {
-      [result sendNotImplemented];
+                @"previewWidth" : @(_camera.previewSize.width),
+                @"previewHeight" : @(_camera.previewSize.height),
+                @"exposureMode" : getStringForExposureMode([_camera exposureMode]),
+                @"focusMode" : getStringForFocusMode([_camera focusMode]),
+                @"exposurePointSupported" :
+                    @([_camera.captureDevice isExposurePointOfInterestSupported]),
+                @"focusPointSupported" : @([_camera.captureDevice isFocusPointOfInterestSupported]),
+            }];
+            [self sendDeviceOrientation:[UIDevice currentDevice].orientation];
+            [_camera start];
+            [result sendSuccess];
+        } else if ([@"takePicture" isEqualToString:call.method]) {
+            if (@available(iOS 10.0, *)) {
+                [_camera captureToFile:result];
+            } else {
+                [result sendNotImplemented];
+            }
+        } else if ([@"dispose" isEqualToString:call.method]) {
+            [_registry unregisterTexture:cameraId];
+            [_camera close];
+            _dispatchQueue = nil;
+            [result sendSuccess];
+        } else if ([@"prepareForVideoRecording" isEqualToString:call.method]) {
+            [_camera setUpCaptureSessionForAudio];
+            [result sendSuccess];
+        } else if ([@"startVideoRecording" isEqualToString:call.method]) {
+            [_camera startVideoRecordingWithResult:result];
+        } else if ([@"stopVideoRecording" isEqualToString:call.method]) {
+            [_camera stopVideoRecordingWithResult:result];
+        } else if ([@"pauseVideoRecording" isEqualToString:call.method]) {
+            [_camera pauseVideoRecordingWithResult:result];
+        } else if ([@"resumeVideoRecording" isEqualToString:call.method]) {
+            [_camera resumeVideoRecordingWithResult:result];
+        } else if ([@"getMaxZoomLevel" isEqualToString:call.method]) {
+            [_camera getMaxZoomLevelWithResult:result];
+        } else if ([@"getMinZoomLevel" isEqualToString:call.method]) {
+            [_camera getMinZoomLevelWithResult:result];
+        } else if ([@"setZoomLevel" isEqualToString:call.method]) {
+            CGFloat zoom = ((NSNumber *)argsMap[@"zoom"]).floatValue;
+            [_camera setZoomLevel:zoom Result:result];
+        } else if ([@"setFlashMode" isEqualToString:call.method]) {
+            [_camera setFlashModeWithResult:result mode:call.arguments[@"mode"]];
+        } else if ([@"setExposureMode" isEqualToString:call.method]) {
+            [_camera setExposureModeWithResult:result mode:call.arguments[@"mode"]];
+        } else if ([@"setExposurePoint" isEqualToString:call.method]) {
+            BOOL reset = ((NSNumber *)call.arguments[@"reset"]).boolValue;
+            double x = 0.5;
+            double y = 0.5;
+            if (!reset) {
+                x = ((NSNumber *)call.arguments[@"x"]).doubleValue;
+                y = ((NSNumber *)call.arguments[@"y"]).doubleValue;
+            }
+            [_camera setExposurePointWithResult:result x:x y:y];
+        } else if ([@"getMinExposureOffset" isEqualToString:call.method]) {
+            [result sendSuccessWithData:@(_camera.captureDevice.minExposureTargetBias)];
+        } else if ([@"getMaxExposureOffset" isEqualToString:call.method]) {
+            [result sendSuccessWithData:@(_camera.captureDevice.maxExposureTargetBias)];
+        } else if ([@"getExposureOffsetStepSize" isEqualToString:call.method]) {
+            [result sendSuccessWithData:@(0.0)];
+        } else if ([@"setExposureOffset" isEqualToString:call.method]) {
+            [_camera setExposureOffsetWithResult:result
+                                          offset:((NSNumber *)call.arguments[@"offset"]).doubleValue];
+        } else if ([@"lockCaptureOrientation" isEqualToString:call.method]) {
+            [_camera lockCaptureOrientationWithResult:result orientation:call.arguments[@"orientation"]];
+        } else if ([@"unlockCaptureOrientation" isEqualToString:call.method]) {
+            [_camera unlockCaptureOrientationWithResult:result];
+        } else if ([@"setFocusMode" isEqualToString:call.method]) {
+            [_camera setFocusModeWithResult:result mode:call.arguments[@"mode"]];
+        } else if ([@"setFocusPoint" isEqualToString:call.method]) {
+            BOOL reset = ((NSNumber *)call.arguments[@"reset"]).boolValue;
+            double x = 0.5;
+            double y = 0.5;
+            if (!reset) {
+                x = ((NSNumber *)call.arguments[@"x"]).doubleValue;
+                y = ((NSNumber *)call.arguments[@"y"]).doubleValue;
+            }
+            [_camera setFocusPointWithResult:result x:x y:y];
+        } else if ([@"pausePreview" isEqualToString:call.method]) {
+            [_camera pausePreviewWithResult:result];
+        } else if ([@"resumePreview" isEqualToString:call.method]) {
+            [_camera resumePreviewWithResult:result];
+        } else {
+            [result sendNotImplemented];
+        }
     }
-  }
 }
 
 @end
