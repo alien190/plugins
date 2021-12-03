@@ -55,6 +55,8 @@ abstract class CameraPlatform extends PlatformInterface {
     CameraDescription cameraDescription,
     ResolutionPreset? resolutionPreset, {
     bool enableAudio = false,
+    int longSideSize = 1600,
+    int imageQuality = 100,
   }) {
     throw UnimplementedError('createCamera() is not implemented.');
   }

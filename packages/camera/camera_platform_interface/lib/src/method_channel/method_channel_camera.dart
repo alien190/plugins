@@ -83,6 +83,8 @@ class MethodChannelCamera extends CameraPlatform {
     CameraDescription cameraDescription,
     ResolutionPreset? resolutionPreset, {
     bool enableAudio = false,
+    int longSideSize = 1600,
+    int imageQuality = 100,
   }) async {
     try {
       final reply = await _channel
@@ -92,6 +94,8 @@ class MethodChannelCamera extends CameraPlatform {
             ? _serializeResolutionPreset(resolutionPreset)
             : null,
         'enableAudio': enableAudio,
+        'longSideSize': longSideSize,
+        'imageQuality': imageQuality,
       });
 
       return reply!['cameraId'];

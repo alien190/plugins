@@ -119,6 +119,12 @@ class FakeController extends ValueNotifier<CameraValue>
 
   @override
   Future<void> resumePreview() async {}
+
+  @override
+  int get imageQuality => 100;
+
+  @override
+  int get longSideSize => 1600;
 }
 
 void main() {
