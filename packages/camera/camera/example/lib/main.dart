@@ -10,6 +10,7 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:share/share.dart';
 import 'package:video_player/video_player.dart';
 
 class CameraExampleHome extends StatefulWidget {
@@ -62,6 +63,10 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
   double _maxAvailableZoom = 1.0;
   double _currentScale = 1.0;
   double _baseScale = 1.0;
+  Size previewSize = Size.zero;
+  double previewRatio = 0;
+  int longSideSize = 1600;
+  int imageQuality = 100;
 
   // Counting pointers (number of user fingers on screen)
   int _pointers = 0;
@@ -160,10 +165,12 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
               mainAxisAlignment: MainAxisAlignment.start,
               children: <Widget>[
                 _cameraTogglesRowWidget(),
+                _cameraPreviewSizeWidget(),
                 _thumbnailWidget(),
               ],
             ),
           ),
+          _sizeAndQualitySettings(),
         ],
       ),
     );
@@ -232,14 +239,12 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
                 ? Container()
                 : SizedBox(
                     child: (localVideoController == null)
-                        ? (
-                            // The captured image on the web contains a network-accessible URL
-                            // pointing to a location within the browser. It may be displayed
-                            // either with Image.network or Image.memory after loading the image
-                            // bytes to memory.
-                            kIsWeb
+                        ? GestureDetector(
+                            onTap: () => _shareImageFile(imageFile!.path),
+                            child: kIsWeb
                                 ? Image.network(imageFile!.path)
-                                : Image.file(File(imageFile!.path)))
+                                : Image.file(File(imageFile!.path)),
+                          )
                         : Container(
                             child: Center(
                               child: AspectRatio(
@@ -260,6 +265,10 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
         ),
       ),
     );
+  }
+
+  void _shareImageFile(String path) {
+    Share.shareFiles([path]);
   }
 
   /// Display a bar with buttons to change the flash and exposure modes
@@ -602,6 +611,67 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     return Row(children: toggles);
   }
 
+  Widget _cameraPreviewSizeWidget() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Text(
+        'w:${previewSize.width}\n'
+        'h:${previewSize.height}\n'
+        'r:${previewRatio.toStringAsFixed(4)}',
+      ),
+    );
+  }
+
+  Widget _sizeAndQualitySettings() {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Row(
+        mainAxisSize: MainAxisSize.max,
+        children: [
+          Expanded(
+            child: TextFormField(
+              decoration: InputDecoration(
+                hintText: 'Long side size',
+                border: UnderlineInputBorder(
+                  borderSide: BorderSide(
+                    width: 1,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+              onChanged: (String s) =>
+                  longSideSize = int.tryParse(s, radix: 10) ?? 1600,
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: TextFormField(
+              decoration: InputDecoration(
+                hintText: 'Image quality',
+              ),
+              onChanged: (String s) =>
+                  imageQuality = int.tryParse(s, radix: 10) ?? 100,
+            ),
+          ),
+          SizedBox(width: 12),
+          IconButton(onPressed: _setSizeAndQuality, icon: Icon(Icons.done))
+        ],
+      ),
+    );
+  }
+
+  void _setSizeAndQuality() {
+    if (controller == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please select camera'),
+        ),
+      );
+    } else {
+      onNewCameraSelected(controller!.description);
+    }
+  }
+
   String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
 
   void showInSnackBar(String message) {
@@ -634,12 +704,19 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
       kIsWeb ? ResolutionPreset.max : ResolutionPreset.custom43,
       enableAudio: enableAudio,
       imageFormatGroup: ImageFormatGroup.jpeg,
+      longSideSize: longSideSize,
+      imageQuality: imageQuality,
     );
 
     controller = cameraController;
 
     // If the controller is updated then update the UI.
     cameraController.addListener(() {
+      previewSize = cameraController.value.previewSize ?? Size.zero;
+      previewRatio = previewSize == Size.zero
+          ? 0
+          : previewSize.longestSide / previewSize.shortestSide;
+
       if (mounted) setState(() {});
       if (cameraController.value.hasError) {
         showInSnackBar(

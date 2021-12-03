@@ -36,6 +36,9 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
     private CamcorderProfile recordingProfileLegacy;
     private ResolutionPreset currentSetting;
     private int cameraId;
+    private final int longSideSize;
+    private final int shortSideSize;
+    private final int imageQuality;
 
     /**
      * Creates a new instance of the {@link ResolutionFeature}.
@@ -47,10 +50,15 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
     public ResolutionFeature(
             CameraProperties cameraProperties,
             ResolutionPreset resolutionPreset,
-            String cameraName
+            String cameraName,
+            int longSideSize,
+            int imageQuality
     ) {
         super(cameraProperties);
         this.currentSetting = resolutionPreset;
+        this.longSideSize = longSideSize > 0 ? longSideSize : 1600;
+        this.shortSideSize = (int) ((float) this.longSideSize / 1.333333333f);
+        this.imageQuality = imageQuality >= 0 && imageQuality <= 100 ? imageQuality : 100;
         try {
             this.cameraId = Integer.parseInt(cameraName, 10);
         } catch (NumberFormatException e) {
@@ -168,7 +176,7 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
             case custom43:
                 if (CamcorderProfile.hasProfile(cameraId, CamcorderProfile.QUALITY_1080P)) {
                     return CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_1080P);
-                }    
+                }
             case high:
                 if (CamcorderProfile.hasProfile(cameraId, CamcorderProfile.QUALITY_720P)) {
                     return CamcorderProfile.get(cameraId, CamcorderProfile.QUALITY_720P);
@@ -246,22 +254,20 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
         }
 
         if (jpegClosestSize != null && yuvClosestSize != null) {
-            if (yuvClosestSize.getWidth() == ResolutionPreset.PREFFERED_43FORMAT_WIDTH
-                    && yuvClosestSize.getHeight() == ResolutionPreset.PREFFERED_43FORMAT_HEIGHT) {
+            if (yuvClosestSize.getWidth() == longSideSize
+                    && yuvClosestSize.getHeight() == shortSideSize) {
                 captureFormat = ImageFormat.YUV_420_888;
-                final Size size = new Size(ResolutionPreset.PREFFERED_43FORMAT_WIDTH,
-                        ResolutionPreset.PREFFERED_43FORMAT_HEIGHT);
+                final Size size = new Size(longSideSize, shortSideSize);
                 previewSize = size;
                 captureSize = size;
                 Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
                 return;
             }
 
-            if (jpegClosestSize.getWidth() == ResolutionPreset.PREFFERED_43FORMAT_WIDTH
-                    && jpegClosestSize.getHeight() == ResolutionPreset.PREFFERED_43FORMAT_HEIGHT) {
+            if (jpegClosestSize.getWidth() == longSideSize
+                    && jpegClosestSize.getHeight() == shortSideSize) {
                 captureFormat = ImageFormat.JPEG;
-                final Size size = new Size(ResolutionPreset.PREFFERED_43FORMAT_WIDTH,
-                        ResolutionPreset.PREFFERED_43FORMAT_HEIGHT);
+                final Size size = new Size(longSideSize, shortSideSize);
                 previewSize = size;
                 captureSize = size;
                 Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
@@ -325,13 +331,25 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
 
             if (aspectRatio >= ResolutionPreset.PREFFERED_43FORMAT_LOW_ASPECT_RATIO &&
                     aspectRatio <= ResolutionPreset.PREFFERED_43FORMAT_HIGH_ASPECT_RATIO &&
-                    longSide >= ResolutionPreset.PREFFERED_43FORMAT_WIDTH &&
-                    shortSide >= ResolutionPreset.PREFFERED_43FORMAT_HEIGHT) {
+                    longSide >= longSideSize &&
+                    shortSide >= shortSideSize) {
                 Log.w(TAG, "Selected size: " + size + ", format: " + format);
                 return size;
             }
         }
         Log.w(TAG, "Size selection error: No appropriate size");
         throw new IllegalStateException("No sizes");
+    }
+
+    public int getLongSideSize() {
+        return longSideSize;
+    }
+
+    public int getShortSideSize() {
+        return shortSideSize;
+    }
+
+    public int getImageQuality() {
+        return imageQuality;
     }
 }

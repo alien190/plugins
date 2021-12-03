@@ -162,7 +162,9 @@ class Camera
             final DartMessenger dartMessenger,
             final CameraProperties cameraProperties,
             final ResolutionPreset resolutionPreset,
-            final boolean enableAudio) {
+            final boolean enableAudio,
+            final int longSideSize,
+            final int imageQuality) {
 
         if (activity == null) {
             throw new IllegalStateException("No activity available!");
@@ -174,9 +176,14 @@ class Camera
         this.applicationContext = activity.getApplicationContext();
         this.cameraProperties = cameraProperties;
         this.cameraFeatureFactory = cameraFeatureFactory;
-        this.cameraFeatures =
-                CameraFeatures.init(
-                        cameraFeatureFactory, cameraProperties, activity, dartMessenger, resolutionPreset);
+        this.cameraFeatures = CameraFeatures.init(
+                cameraFeatureFactory,
+                cameraProperties,
+                activity,
+                dartMessenger,
+                resolutionPreset,
+                longSideSize,
+                imageQuality);
 
         // Create capture callback.
         captureTimeouts = new CaptureTimeoutsWrapper(3000, 3000);
@@ -508,7 +515,7 @@ class Camera
         //if (isAutoFocusSupported && autoFocusFeature.getValue() == FocusMode.auto) {
         //    runPictureAutoFocus();
         //} else {
-            runPrecaptureSequence();
+        runPrecaptureSequence();
         //}
     }
 
@@ -1089,8 +1096,9 @@ class Camera
                         // Use acquireNextImage since image reader is only for one image.
                         reader.acquireNextImage(),
                         captureFile,
-                        ResolutionPreset.PREFFERED_43FORMAT_WIDTH,
+                        cameraFeatures.getResolution().getLongSideSize(),
                         cameraFeatures.getSensorOrientation().getDeviceOrientationManager().getPhotoOrientation(),
+                        cameraFeatures.getResolution().getImageQuality(),
                         new ImageSaver.Callback() {
                             @Override
                             public void onComplete(String absolutePath) {

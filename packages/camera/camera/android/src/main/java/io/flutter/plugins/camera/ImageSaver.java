@@ -46,6 +46,8 @@ public class ImageSaver implements Runnable {
 
     private final Integer targetAngel;
 
+    private final Integer imageQuality;
+
     /**
      * Creates an instance of the ImageSaver runnable
      *
@@ -57,6 +59,7 @@ public class ImageSaver implements Runnable {
                @NonNull File file,
                @Nullable Integer targetWidth,
                @Nullable Integer targetAngel,
+               @Nullable Integer imageQuality,
                @NonNull Callback callback
     ) {
         this.image = image;
@@ -64,6 +67,7 @@ public class ImageSaver implements Runnable {
         this.callback = callback;
         this.targetAngel = targetAngel;
         this.targetWidth = targetWidth;
+        this.imageQuality = imageQuality != null && imageQuality >= 0 && imageQuality <= 100 ? imageQuality : 100;
     }
 
     @Override
@@ -118,7 +122,7 @@ public class ImageSaver implements Runnable {
             Log.w(TAG, "dstBitmap was created (rotation + scale). Width:" + dstBitmap.getWidth() + ", height:" + dstBitmap.getHeight());
 
             output = FileOutputStreamFactory.create(file);
-            dstBitmap.compress(Bitmap.CompressFormat.JPEG, 100, output);
+            dstBitmap.compress(Bitmap.CompressFormat.JPEG, imageQuality, output);
 
             callback.onComplete(file.getAbsolutePath());
             Log.w(TAG, "onComplete()");
