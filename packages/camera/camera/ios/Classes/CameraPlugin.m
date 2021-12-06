@@ -162,11 +162,11 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
     UIImage* image = [[UIImage alloc] initWithData:photoData];
     // Calculate Destination Size
     CGAffineTransform rotationTransform = CGAffineTransformMakeRotation(rotation);
-    CGFloat ratio = 1;
+    double ratio = 1;
     if(image.size.width > image.size.height) {
-        ratio = ((CGFloat)PREFFERED_43FORMAT_WIDTH) / image.size.width;
+        ratio = ((double)PREFFERED_43FORMAT_WIDTH) / image.size.width;
     } else {
-        ratio = ((CGFloat)PREFFERED_43FORMAT_WIDTH) / image.size.height;
+        ratio = ((double)PREFFERED_43FORMAT_WIDTH) / image.size.height;
     }
 
     CGAffineTransform scaleTransform = CGAffineTransformMakeScale(ratio, ratio);
@@ -175,13 +175,14 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
     CGRect scaledRect = CGRectApplyAffineTransform(sizeRect, scaleTransform);
     CGRect destRect = CGRectApplyAffineTransform(scaledRect, rotationTransform);
     
-    CGSize destinationSize = CGSizeMake(destRect.size.width < 1600 ? 1200 : 1600, destRect.size.height < 1600 ? 1200 : 1600);
+    CGSize destinationSize = CGSizeMake(destRect.size.width, destRect.size.height);
     
     // Draw image
     UIGraphicsBeginImageContext(destinationSize);
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextTranslateCTM(context, destinationSize.width / 2.0f, destinationSize.height / 2.0f);
     CGContextRotateCTM(context, rotation);
+    CGContextScaleCTM(context, ratio, ratio);
     [image drawInRect:CGRectMake(-image.size.width / 2.0f, -image.size.height / 2.0f, image.size.width, image.size.height)];
     
     // Save image
@@ -492,12 +493,11 @@ NSString *const errorMethod = @"error";
         *error = localError;
         return nil;
     }
-    
+        
     _captureVideoOutput = [AVCaptureVideoDataOutput new];
     _captureVideoOutput.videoSettings =
     @{(NSString *)kCVPixelBufferPixelFormatTypeKey : @(videoFormat)};
     [_captureVideoOutput setAlwaysDiscardsLateVideoFrames:YES];
-    [_captureVideoOutput setSampleBufferDelegate:self queue:dispatch_get_main_queue()];
     
     AVCaptureConnection *connection =
     [AVCaptureConnection connectionWithInputPorts:_captureVideoInput.ports
@@ -516,13 +516,34 @@ NSString *const errorMethod = @"error";
         [_capturePhotoOutput setHighResolutionCaptureEnabled:YES];
         [_captureSession addOutput:_capturePhotoOutput];
     }
-    _motionManager = [[CMMotionManager alloc] init];
-    [_motionManager startAccelerometerUpdates];
-    
     
     [self setActiveFormatForCamera:_captureDevice
                         resolution:[self setCaptureSessionPreset:_resolutionPreset
                                                    captureDevice:_captureDevice]];
+    
+    [_captureVideoOutput setSampleBufferDelegate:self queue:dispatch_get_main_queue()];
+    
+    _motionManager = [[CMMotionManager alloc] init];
+    _motionManager.accelerometerUpdateInterval = 0.5f;
+    [_motionManager startAccelerometerUpdatesToQueue:NSOperationQueue.mainQueue
+                                         withHandler:^(CMAccelerometerData *accelerometerData, NSError* error) {
+        if(accelerometerData!=nil && error == nil) {
+            CMAcceleration acceleration = accelerometerData.acceleration;
+            if(fabs(acceleration.y) < fabs(acceleration.x)) {
+                if(acceleration.x > 0 ) {
+                    [self setDeviceOrientation: UIDeviceOrientationLandscapeRight];
+                } else {
+                    [self setDeviceOrientation: UIDeviceOrientationLandscapeLeft];
+                }
+            } else {
+                if(acceleration.y > 0 ) {
+                    [self setDeviceOrientation: UIDeviceOrientationPortraitUpsideDown];
+                } else {
+                    [self setDeviceOrientation: UIDeviceOrientationPortrait];
+                }
+            }
+        }
+    }];
     
     [self updateOrientation];
     
@@ -541,7 +562,6 @@ NSString *const errorMethod = @"error";
     if (_deviceOrientation == orientation) {
         return;
     }
-    
     _deviceOrientation = orientation;
     [self updateOrientation];
 }
@@ -1558,16 +1578,16 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 - (void)orientationChanged:(NSNotification *)note {
     UIDevice *device = note.object;
     UIDeviceOrientation orientation = device.orientation;
-    
+
     if (orientation == UIDeviceOrientationFaceUp || orientation == UIDeviceOrientationFaceDown) {
         // Do not change when oriented flat.
         return;
     }
-    
+
     if (_camera) {
         [_camera setDeviceOrientation:orientation];
     }
-    
+
     [self sendDeviceOrientation:orientation];
 }
 
