@@ -61,7 +61,8 @@ typedef enum {
 @interface FLTSavePhotoDelegate : NSObject <AVCapturePhotoCaptureDelegate>
 @property(readonly, nonatomic) NSString *path;
 @property(readonly, nonatomic) FLTThreadSafeFlutterResult *result;
-@property(readonly, nonatomic) UIDeviceOrientation deviceOrientation;
+@property(readonly, nonatomic) UIDeviceOrientation uiDeviceOrientation;
+@property(readonly, nonatomic) UIDeviceOrientation accelerometerDeviceOrientation;
 @property(readonly, nonatomic) UIDeviceOrientation lockedOrientation;
 @property(readonly, nonatomic) ResolutionPreset resolutionPreset;
 @end
@@ -90,7 +91,8 @@ typedef enum {
 }
 
 - initWithPath:(NSString *) path result:(FLTThreadSafeFlutterResult *)result
-                      deviceOrientation:(UIDeviceOrientation) deviceOrientation
+                      uiDeviceOrientation:(UIDeviceOrientation) uiDeviceOrientation
+                      accelerometerDeviceOrientation:(UIDeviceOrientation) accelerometerDeviceOrientation
                       lockedOrientation:(UIDeviceOrientation) lockedOrientation
                        resolutionPreset:(ResolutionPreset)resolutionPreset{
     self = [super init];
@@ -98,7 +100,8 @@ typedef enum {
     _path = path;
     selfReference = self;
     _result = result;
-    _deviceOrientation = deviceOrientation;
+    _uiDeviceOrientation = uiDeviceOrientation;
+    _accelerometerDeviceOrientation = accelerometerDeviceOrientation;
     _lockedOrientation = lockedOrientation;
     _resolutionPreset = resolutionPreset;
     return self;
@@ -156,9 +159,14 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
 }
 
 -(void) processPhotoData: (NSData*) photoData {
-    CGFloat rotation = _lockedOrientation == UIDeviceOrientationUnknown ? 0
-                                             : [self getRotationAngleInRadiansForOrintation:_deviceOrientation] -
-                                               [self getRotationAngleInRadiansForOrintation:_lockedOrientation];
+    CGFloat rotation = (_lockedOrientation == UIDeviceOrientationUnknown && _accelerometerDeviceOrientation == _uiDeviceOrientation)? 0 :
+                       (_accelerometerDeviceOrientation != _uiDeviceOrientation
+                                       // when UI orientation is fixed in the device settings
+                                       ? [self getRotationAngleInRadiansForOrintation:_accelerometerDeviceOrientation] -
+                                         [self getRotationAngleInRadiansForOrintation:_uiDeviceOrientation]
+                                      // when UI orientation changing is allowed in the device settings
+                                       : [self getRotationAngleInRadiansForOrintation:_uiDeviceOrientation] -
+                                         [self getRotationAngleInRadiansForOrintation:_lockedOrientation]);
     UIImage* image = [[UIImage alloc] initWithData:photoData];
     // Calculate Destination Size
     CGAffineTransform rotationTransform = CGAffineTransformMakeRotation(rotation);
@@ -456,7 +464,8 @@ AVCaptureAudioDataOutputSampleBufferDelegate>
 
 @implementation FLTCam {
     dispatch_queue_t _dispatchQueue;
-    UIDeviceOrientation _deviceOrientation;
+    UIDeviceOrientation _uiDeviceOrientation;
+    UIDeviceOrientation _accelerometerDeviceOrientation;
 }
 // Format used for video and image streaming.
 FourCharCode videoFormat = kCVPixelFormatType_32BGRA;
@@ -483,7 +492,7 @@ NSString *const errorMethod = @"error";
     _exposureMode = ExposureModeAuto;
     _focusMode = FocusModeAuto;
     _lockedCaptureOrientation = UIDeviceOrientationUnknown;
-    _deviceOrientation = orientation;
+    _uiDeviceOrientation = orientation;
     
     NSError *localError = nil;
     _captureVideoInput = [AVCaptureDeviceInput deviceInputWithDevice:_captureDevice
@@ -531,15 +540,15 @@ NSString *const errorMethod = @"error";
             CMAcceleration acceleration = accelerometerData.acceleration;
             if(fabs(acceleration.y) < fabs(acceleration.x)) {
                 if(acceleration.x > 0 ) {
-                    [self setDeviceOrientation: UIDeviceOrientationLandscapeRight];
+                    [self setAccelerometerDeviceOrientation: UIDeviceOrientationLandscapeRight];
                 } else {
-                    [self setDeviceOrientation: UIDeviceOrientationLandscapeLeft];
+                    [self setAccelerometerDeviceOrientation: UIDeviceOrientationLandscapeLeft];
                 }
             } else {
                 if(acceleration.y > 0 ) {
-                    [self setDeviceOrientation: UIDeviceOrientationPortraitUpsideDown];
+                    [self setAccelerometerDeviceOrientation: UIDeviceOrientationPortraitUpsideDown];
                 } else {
-                    [self setDeviceOrientation: UIDeviceOrientationPortrait];
+                    [self setAccelerometerDeviceOrientation: UIDeviceOrientationPortrait];
                 }
             }
         }
@@ -558,11 +567,19 @@ NSString *const errorMethod = @"error";
     [_captureSession stopRunning];
 }
 
-- (void)setDeviceOrientation:(UIDeviceOrientation)orientation {
-    if (_deviceOrientation == orientation) {
+- (void)setAccelerometerDeviceOrientation:(UIDeviceOrientation)orientation {
+    if (_accelerometerDeviceOrientation == orientation) {
         return;
     }
-    _deviceOrientation = orientation;
+    _accelerometerDeviceOrientation = orientation;
+
+}
+
+- (void)setUiDeviceOrientation:(UIDeviceOrientation)orientation {
+    if (_uiDeviceOrientation == orientation) {
+        return;
+    }
+    _uiDeviceOrientation = orientation;
     [self updateOrientation];
 }
 
@@ -573,7 +590,7 @@ NSString *const errorMethod = @"error";
     
     UIDeviceOrientation orientation = (_lockedCaptureOrientation != UIDeviceOrientationUnknown)
     ? _lockedCaptureOrientation
-    : _deviceOrientation;
+    : _uiDeviceOrientation;
     
     [self updateOrientation:orientation forCaptureOutput:_capturePhotoOutput];
     [self updateOrientation:orientation forCaptureOutput:_captureVideoOutput];
@@ -613,10 +630,10 @@ NSString *const errorMethod = @"error";
     
     UIDeviceOrientation orientation;
     if(_lockedCaptureOrientation == UIDeviceOrientationUnknown) {
-        orientation = _deviceOrientation;
+        orientation = _uiDeviceOrientation;
     }
     else {
-        switch(_deviceOrientation) {
+        switch(_uiDeviceOrientation) {
             case UIDeviceOrientationUnknown:
             case UIDeviceOrientationFaceUp:
             case UIDeviceOrientationFaceDown:
@@ -643,7 +660,8 @@ NSString *const errorMethod = @"error";
     [_capturePhotoOutput capturePhotoWithSettings:settings
                                          delegate:[[FLTSavePhotoDelegate alloc] initWithPath:path
                                                                                       result:result
-                                                                           deviceOrientation:_deviceOrientation
+                                                                         uiDeviceOrientation:_uiDeviceOrientation
+                                                              accelerometerDeviceOrientation:_accelerometerDeviceOrientation
                                                                            lockedOrientation:_lockedCaptureOrientation
                                                                             resolutionPreset:_resolutionPreset]];
 }
@@ -1585,7 +1603,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     }
 
     if (_camera) {
-        [_camera setDeviceOrientation:orientation];
+        [_camera setUiDeviceOrientation:orientation];
     }
 
     [self sendDeviceOrientation:orientation];
