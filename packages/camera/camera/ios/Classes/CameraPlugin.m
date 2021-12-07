@@ -14,7 +14,6 @@
 #import <Foundation/Foundation.h>
 #import <GLKit/GLKit.h>
 
-
 int const PREFFERED_43FORMAT_WIDTH = 1600;
 int const PREFFERED_43FORMAT_HEIGHT = 1200;
 float const PREFFERED_43FORMAT_LOW_ASPECT_RATIO = 1.3;
@@ -1629,6 +1628,32 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     });
 }
 
+-(void) checkCameraAuthorizationWithSuccessBloc:(void(^)(void)) successBloc
+                                       failBloc:(void(^)(void)) failBloc
+{
+    AVAuthorizationStatus status = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
+    if(status == AVAuthorizationStatusDenied || status == AVAuthorizationStatusRestricted) {
+        failBloc();
+    } else if (status == AVAuthorizationStatusAuthorized) {
+        successBloc();
+    } else {
+        [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo completionHandler:^(BOOL granted){
+            if(granted) {
+                NSObject* observer = [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
+                                                                      object:nil
+                                                                       queue:NSOperationQueue.mainQueue
+                                                                  usingBlock:
+                  ^(NSNotification* notification){
+                        successBloc();
+                        [[NSNotificationCenter defaultCenter] removeObserver:observer];
+                    }];
+            } else {
+                failBloc();
+            }
+        }];
+    }
+}
+
 - (void)handleMethodCallAsync:(FlutterMethodCall *)call
                        result:(FLTThreadSafeFlutterResult *)result {
     if ([@"availableCameras" isEqualToString:call.method]) {
@@ -1664,29 +1689,44 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
             [result sendNotImplemented];
         }
     } else if ([@"create" isEqualToString:call.method]) {
-        NSString *cameraName = call.arguments[@"cameraName"];
-        NSString *resolutionPreset = call.arguments[@"resolutionPreset"];
-        NSNumber *enableAudio = call.arguments[@"enableAudio"];
-        NSError *error;
-        FLTCam *cam = [[FLTCam alloc] initWithCameraName:cameraName
-                                        resolutionPreset:resolutionPreset
-                                             enableAudio:[enableAudio boolValue]
-                                             orientation:[[UIDevice currentDevice] orientation]
-                                           dispatchQueue:_dispatchQueue
-                                                   error:&error];
-        
-        if (error) {
-            [result sendError:error];
-        } else {
-            if (_camera) {
-                [_camera close];
+        [self checkCameraAuthorizationWithSuccessBloc:
+         ^{
+            NSString *cameraName = call.arguments[@"cameraName"];
+            NSString *resolutionPreset = call.arguments[@"resolutionPreset"];
+            NSNumber *enableAudio = call.arguments[@"enableAudio"];
+            NSError *error;
+            FLTCam *cam = [[FLTCam alloc] initWithCameraName:cameraName
+                                            resolutionPreset:resolutionPreset
+                                                 enableAudio:[enableAudio boolValue]
+                                                 orientation:[[UIDevice currentDevice] orientation]
+                                               dispatchQueue:self->_dispatchQueue
+                                                       error:&error];
+            
+            if (error) {
+                [result sendError:error];
+            } else {
+                if (self->_camera) {
+                    [self->_camera close];
+                }
+                int64_t textureId = [self.registry registerTexture:cam];
+                self->_camera = cam;
+                [result sendSuccessWithData:@{
+                    @"cameraId" : @(textureId),
+                }];
             }
-            int64_t textureId = [self.registry registerTexture:cam];
-            _camera = cam;
-            [result sendSuccessWithData:@{
-                @"cameraId" : @(textureId),
-            }];
         }
+        failBloc:
+         ^{
+            [result sendError:
+                 [NSError errorWithDomain:@"CameraPlugin"
+                                     code:0
+                                 userInfo:@{NSLocalizedDescriptionKey: @"Camera permission is not granted"}
+                 ]
+            ];
+        }
+        ];
+        
+
     } else if ([@"startImageStream" isEqualToString:call.method]) {
         [_camera startImageStreamWithMessenger:_messenger];
         [result sendSuccess];
