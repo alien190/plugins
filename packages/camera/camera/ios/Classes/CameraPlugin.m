@@ -14,8 +14,10 @@
 #import <Foundation/Foundation.h>
 #import <GLKit/GLKit.h>
 
-int const PREFFERED_43FORMAT_WIDTH = 1600;
-int const PREFFERED_43FORMAT_HEIGHT = 1200;
+int const DEFAULT_43FORMAT_LONG_SIDE_SIZE = 1600;
+int const DEFAULT_43FORMAT_IMAGE_QUALITY = 100;
+//int const PREFFERED_43FORMAT_WIDTH = 1600;
+//int const PREFFERED_43FORMAT_HEIGHT = 1200;
 float const PREFFERED_43FORMAT_LOW_ASPECT_RATIO = 1.3;
 float const PREFFERED_43FORMAT_HIGH_ASPECT_RATIO = 1.4;
 
@@ -64,6 +66,8 @@ typedef enum {
 @property(readonly, nonatomic) UIDeviceOrientation accelerometerDeviceOrientation;
 @property(readonly, nonatomic) UIDeviceOrientation lockedOrientation;
 @property(readonly, nonatomic) ResolutionPreset resolutionPreset;
+@property(assign, nonatomic) int longSideSize;
+@property(assign, nonatomic) int imageQality;
 @end
 
 @interface FLTImageStreamHandler : NSObject <FlutterStreamHandler>
@@ -89,11 +93,13 @@ typedef enum {
     FLTSavePhotoDelegate *selfReference;
 }
 
-- initWithPath:(NSString *) path result:(FLTThreadSafeFlutterResult *)result
+- initWithPath:(NSString *)   path result:(FLTThreadSafeFlutterResult *)result
                       uiDeviceOrientation:(UIDeviceOrientation) uiDeviceOrientation
-                      accelerometerDeviceOrientation:(UIDeviceOrientation) accelerometerDeviceOrientation
-                      lockedOrientation:(UIDeviceOrientation) lockedOrientation
-                       resolutionPreset:(ResolutionPreset)resolutionPreset{
+           accelerometerDeviceOrientation:(UIDeviceOrientation) accelerometerDeviceOrientation
+                        lockedOrientation:(UIDeviceOrientation) lockedOrientation
+                         resolutionPreset:(ResolutionPreset)resolutionPreset
+                             longSideSize:(int)longSideSize
+                             imageQuality:(int)imageQuality{
     self = [super init];
     NSAssert(self, @"super init cannot be nil");
     _path = path;
@@ -103,6 +109,8 @@ typedef enum {
     _accelerometerDeviceOrientation = accelerometerDeviceOrientation;
     _lockedOrientation = lockedOrientation;
     _resolutionPreset = resolutionPreset;
+    _longSideSize = longSideSize;
+    _imageQality = imageQuality;
     return self;
 }
 
@@ -171,9 +179,9 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
     CGAffineTransform rotationTransform = CGAffineTransformMakeRotation(rotation);
     double ratio = 1;
     if(image.size.width > image.size.height) {
-        ratio = ((double)PREFFERED_43FORMAT_WIDTH) / image.size.width;
+        ratio = ((double)_longSideSize) / image.size.width;
     } else {
-        ratio = ((double)PREFFERED_43FORMAT_WIDTH) / image.size.height;
+        ratio = ((double)_longSideSize) / image.size.height;
     }
 
     CGAffineTransform scaleTransform = CGAffineTransformMakeScale(ratio, ratio);
@@ -196,7 +204,7 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
     UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
     
-    NSData* dstImageData = UIImageJPEGRepresentation(newImage, 1.0f);
+    NSData* dstImageData = UIImageJPEGRepresentation(newImage, ((float)_imageQality / 100));
 
     bool success = [dstImageData writeToFile:_path atomically:YES];
     if (!success) {
@@ -459,6 +467,8 @@ AVCaptureAudioDataOutputSampleBufferDelegate>
 @property(assign, nonatomic) CMTime audioTimeOffset;
 @property(nonatomic) CMMotionManager *motionManager;
 @property AVAssetWriterInputPixelBufferAdaptor *videoAdaptor;
+@property(assign, nonatomic) int longSideSize;
+@property(assign, nonatomic) int imageQality;
 @end
 
 @implementation FLTCam {
@@ -472,6 +482,8 @@ NSString *const errorMethod = @"error";
 
 - (instancetype)initWithCameraName:(NSString *)cameraName
                   resolutionPreset:(NSString *)resolutionPreset
+                      longSideSize:(int)longSideSize
+                      imageQuality:(int)imageQuality
                        enableAudio:(BOOL)enableAudio
                        orientation:(UIDeviceOrientation)orientation
                      dispatchQueue:(dispatch_queue_t)dispatchQueue
@@ -492,6 +504,8 @@ NSString *const errorMethod = @"error";
     _focusMode = FocusModeAuto;
     _lockedCaptureOrientation = UIDeviceOrientationUnknown;
     _uiDeviceOrientation = orientation;
+    _longSideSize = longSideSize > 0 ? longSideSize : DEFAULT_43FORMAT_LONG_SIDE_SIZE;
+    _imageQality = imageQuality > 0 ? imageQuality : DEFAULT_43FORMAT_IMAGE_QUALITY;
     
     NSError *localError = nil;
     _captureVideoInput = [AVCaptureDeviceInput deviceInputWithDevice:_captureDevice
@@ -662,7 +676,9 @@ NSString *const errorMethod = @"error";
                                                                          uiDeviceOrientation:_uiDeviceOrientation
                                                               accelerometerDeviceOrientation:_accelerometerDeviceOrientation
                                                                            lockedOrientation:_lockedCaptureOrientation
-                                                                            resolutionPreset:_resolutionPreset]];
+                                                                            resolutionPreset:_resolutionPreset
+                                                                                longSideSize:_longSideSize
+                                                                                imageQuality:_imageQality]];
 }
 
 - (AVCaptureVideoOrientation)getVideoOrientationForDeviceOrientation:
@@ -723,26 +739,38 @@ NSString *const errorMethod = @"error";
         for (AVCaptureDeviceFormat* format in captureDevice.formats) {
             CMVideoFormatDescriptionRef formatDescription = format.formatDescription;
             CMVideoDimensions dimentions = CMVideoFormatDescriptionGetDimensions(formatDescription);
-            float aspectRatio = ((float) dimentions.width) / dimentions.height;
+            NSCameraResolution* resolution = [[NSCameraResolution alloc] initWithWidth:dimentions.width andHeight:dimentions.height andFormat:format];
+            [resolutions addObject:resolution];
+        }
+
+        [resolutions sortUsingComparator:compareCamaraResolution];
+        NSMutableArray* selectedResolutions = [[NSMutableArray alloc] init];
+     
+        for(NSCameraResolution* resolution in resolutions) {
+            float aspectRatio = ((float) resolution.width) / resolution.heigh;
+            float shortSideSize = resolution.width /((float) _longSideSize);
             
             if(aspectRatio >= PREFFERED_43FORMAT_LOW_ASPECT_RATIO &&
                aspectRatio <= PREFFERED_43FORMAT_HIGH_ASPECT_RATIO &&
-               dimentions.width >= PREFFERED_43FORMAT_WIDTH &&
-               dimentions.height >= PREFFERED_43FORMAT_HEIGHT) {
-                NSCameraResolution* resolution = [[NSCameraResolution alloc] initWithWidth:dimentions.width andHeight:dimentions.height andFormat:format];
-                [resolutions addObject:resolution];
+               resolution.width >= _longSideSize &&
+               resolution.heigh >= shortSideSize) {
+                [selectedResolutions addObject:resolution];
             }
         }
         
-     [resolutions sortUsingComparator:compareCamaraResolution];
-     NSLog(@"%@", resolutions);
-        if([resolutions count] > 0) {
-            NSCameraResolution* resolution = [resolutions objectAtIndex:0];
-            NSLog(@"Selected 4:3 resolution is %@", resolution);
-            _previewSize = CGSizeMake(resolution.width, resolution.heigh);
-            return resolution;
+        NSLog(@"All resolutions:%@", resolutions);
+        NSLog(@"Filtered resolutions:%@", selectedResolutions);
+        NSCameraResolution* resolution;
+        
+        if([selectedResolutions count] > 0) {
+           resolution = [selectedResolutions objectAtIndex:0];
+        } else {
+            resolution = [resolutions lastObject];
         }
-        return nil;
+        
+        NSLog(@"Selected 4:3 resolution is %@", resolution);
+        _previewSize = CGSizeMake(resolution.width, resolution.heigh);
+        return resolution;
     }
     return nil;
 }
@@ -1695,13 +1723,18 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
             NSString *resolutionPreset = call.arguments[@"resolutionPreset"];
             NSNumber *enableAudio = call.arguments[@"enableAudio"];
             NSError *error;
+            NSNumber* longSideSize = call.arguments[@"longSideSize"];
+            NSNumber* imageQuality = call.arguments[@"imageQuality"];
+            
+            
             FLTCam *cam = [[FLTCam alloc] initWithCameraName:cameraName
                                             resolutionPreset:resolutionPreset
+                                                longSideSize:[longSideSize intValue]
+                                                imageQuality:[imageQuality intValue]
                                                  enableAudio:[enableAudio boolValue]
                                                  orientation:[[UIDevice currentDevice] orientation]
                                                dispatchQueue:self->_dispatchQueue
                                                        error:&error];
-            
             if (error) {
                 [result sendError:error];
             } else {
