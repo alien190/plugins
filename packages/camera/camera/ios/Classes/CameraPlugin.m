@@ -739,21 +739,23 @@ NSString *const errorMethod = @"error";
         for (AVCaptureDeviceFormat* format in captureDevice.formats) {
             CMVideoFormatDescriptionRef formatDescription = format.formatDescription;
             CMVideoDimensions dimentions = CMVideoFormatDescriptionGetDimensions(formatDescription);
-            NSCameraResolution* resolution = [[NSCameraResolution alloc] initWithWidth:dimentions.width andHeight:dimentions.height andFormat:format];
-            [resolutions addObject:resolution];
+            float aspectRatio = ((float) dimentions.width) / dimentions.height;
+            
+            if(aspectRatio >= PREFFERED_43FORMAT_LOW_ASPECT_RATIO &&
+               aspectRatio <= PREFFERED_43FORMAT_HIGH_ASPECT_RATIO) {
+                NSCameraResolution* resolution = [[NSCameraResolution alloc]
+                                                  initWithWidth:dimentions.width
+                                                  andHeight:dimentions.height
+                                                  andFormat:format];
+                [resolutions addObject:resolution];
+            }
         }
 
         [resolutions sortUsingComparator:compareCamaraResolution];
         NSMutableArray* selectedResolutions = [[NSMutableArray alloc] init];
      
         for(NSCameraResolution* resolution in resolutions) {
-            float aspectRatio = ((float) resolution.width) / resolution.heigh;
-            float shortSideSize = resolution.width /((float) _longSideSize);
-            
-            if(aspectRatio >= PREFFERED_43FORMAT_LOW_ASPECT_RATIO &&
-               aspectRatio <= PREFFERED_43FORMAT_HIGH_ASPECT_RATIO &&
-               resolution.width >= _longSideSize &&
-               resolution.heigh >= shortSideSize) {
+            if(resolution.width >= _longSideSize) {
                 [selectedResolutions addObject:resolution];
             }
         }
