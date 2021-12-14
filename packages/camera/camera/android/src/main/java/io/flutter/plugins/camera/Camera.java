@@ -263,16 +263,16 @@ class Camera
                         1);
 
         // For image streaming, use the provided image format or fall back to YUV420.
-        Integer imageFormat = supportedImageFormats.get(imageFormatGroup);
-        if (imageFormat == null) {
-            Log.w(TAG, "The selected imageFormatGroup is not supported by Android. Defaulting to yuv420");
-            imageFormat = ImageFormat.YUV_420_888;
-        }
+//        Integer imageFormat = supportedImageFormats.get(imageFormatGroup);
+//        if (imageFormat == null) {
+//            Log.w(TAG, "The selected imageFormatGroup is not supported by Android. Defaulting to yuv420");
+//            imageFormat = ImageFormat.YUV_420_888;
+//        }
         imageStreamReader =
                 ImageReader.newInstance(
                         resolutionFeature.getPreviewSize().getWidth(),
                         resolutionFeature.getPreviewSize().getHeight(),
-                        imageFormat,
+                        resolutionFeature.getCaptureFormat(),
                         1);
 
         // Open the camera.

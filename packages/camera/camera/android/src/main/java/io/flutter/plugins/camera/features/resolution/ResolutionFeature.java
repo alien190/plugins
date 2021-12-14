@@ -254,16 +254,6 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
         }
 
         if (jpegClosestSize != null && yuvClosestSize != null) {
-            if (jpegClosestSize.getWidth() == longSideSize
-                    && jpegClosestSize.getHeight() == shortSideSize) {
-                captureFormat = ImageFormat.JPEG;
-                final Size size = new Size(longSideSize, shortSideSize);
-                previewSize = size;
-                captureSize = size;
-                Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
-                return;
-            }
-
             if (yuvClosestSize.getWidth() == longSideSize
                     && yuvClosestSize.getHeight() == shortSideSize) {
                 captureFormat = ImageFormat.YUV_420_888;
@@ -274,18 +264,28 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
                 return;
             }
 
-            if (jpegClosestSize.getWidth() <= yuvClosestSize.getWidth()
-                    && jpegClosestSize.getHeight() <= yuvClosestSize.getHeight()) {
+            if (jpegClosestSize.getWidth() == longSideSize
+                    && jpegClosestSize.getHeight() == shortSideSize) {
                 captureFormat = ImageFormat.JPEG;
-                final Size size = new Size(jpegClosestSize.getWidth(), jpegClosestSize.getHeight());
+                final Size size = new Size(longSideSize, shortSideSize);
                 previewSize = size;
                 captureSize = size;
                 Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
                 return;
             }
 
-            captureFormat = ImageFormat.YUV_420_888;
-            final Size size = new Size(yuvClosestSize.getWidth(), yuvClosestSize.getHeight());
+            if (yuvClosestSize.getWidth() <= jpegClosestSize.getWidth()
+                    && yuvClosestSize.getHeight() <= jpegClosestSize.getHeight()) {
+                captureFormat = ImageFormat.YUV_420_888;
+                final Size size = new Size(yuvClosestSize.getWidth(), yuvClosestSize.getHeight());
+                previewSize = size;
+                captureSize = size;
+                Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
+                return;
+            }
+
+            captureFormat = ImageFormat.JPEG;
+            final Size size = new Size(jpegClosestSize.getWidth(), jpegClosestSize.getHeight());
             previewSize = size;
             captureSize = size;
             Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
@@ -319,6 +319,9 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
                     return widthDiff;
                 }
         );
+
+        Size lastAppropriateAspectRatioSize = null;
+
         for (Size size : sizes) {
             int longSide;
             int shortSide;
@@ -332,14 +335,20 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
             final float aspectRatio = ((float) longSide) / shortSide;
 
             if (aspectRatio >= ResolutionPreset.PREFFERED_43FORMAT_LOW_ASPECT_RATIO &&
-                    aspectRatio <= ResolutionPreset.PREFFERED_43FORMAT_HIGH_ASPECT_RATIO &&
-                    longSide >= longSideSize &&
-                    shortSide >= shortSideSize) {
-                Log.w(TAG, "Selected size: " + size + ", format: " + format);
-                return size;
+                    aspectRatio <= ResolutionPreset.PREFFERED_43FORMAT_HIGH_ASPECT_RATIO) {
+                lastAppropriateAspectRatioSize = size;
+                if (longSide >= longSideSize) {
+                    Log.w(TAG, "Selected size: " + size + ", format: " + format);
+                    return size;
+                }
             }
         }
-        Log.w(TAG, "Size selection error: No appropriate size");
+
+        if (lastAppropriateAspectRatioSize != null) {
+            Log.w(TAG, "Selected last appropriate size: " + lastAppropriateAspectRatioSize + ", format: " + format);
+            return lastAppropriateAspectRatioSize;
+        }
+        Log.w(TAG, "Size selection: No appropriate size");
         throw new IllegalStateException("No sizes");
     }
 
