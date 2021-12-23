@@ -15,7 +15,9 @@ import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
+import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.OutputConfiguration;
 import android.hardware.camera2.params.SessionConfiguration;
@@ -579,7 +581,7 @@ class Camera
         stillBuilder.set(
                 CaptureRequest.SCALER_CROP_REGION,
                 previewRequestBuilder.get(CaptureRequest.SCALER_CROP_REGION));
-
+        
         // Have all features update the builder.
         updateBuilderSettings(stillBuilder);
 
@@ -600,10 +602,40 @@ class Camera
                             @NonNull CameraCaptureSession session,
                             @NonNull CaptureRequest request,
                             @NonNull TotalCaptureResult result) {
+                        Log.i(TAG, "CaptureCallback.onCaptureCompleted()");
                         unlockAutoFocus();
                     }
-                };
 
+                    @Override
+                    public void onCaptureStarted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, long timestamp, long frameNumber) {
+                        Log.i(TAG, "CaptureCallback.onCaptureStarted()");
+                    }
+
+                    @Override
+                    public void onCaptureProgressed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull CaptureResult partialResult) {
+                        Log.i(TAG, "CaptureCallback.onCaptureProgressed()");
+                    }
+
+                    @Override
+                    public void onCaptureFailed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull CaptureFailure failure) {
+                        Log.i(TAG, "CaptureCallback.onCaptureFailed(), reason:" + failure.getReason());
+                    }
+
+                    @Override
+                    public void onCaptureSequenceCompleted(@NonNull CameraCaptureSession session, int sequenceId, long frameNumber) {
+                        Log.i(TAG, "CaptureCallback.onCaptureSequenceCompleted()");
+                    }
+
+                    @Override
+                    public void onCaptureSequenceAborted(@NonNull CameraCaptureSession session, int sequenceId) {
+                        Log.i(TAG, "CaptureCallback.onCaptureSequenceAborted()");
+                    }
+
+                    @Override
+                    public void onCaptureBufferLost(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull Surface target, long frameNumber) {
+                        Log.i(TAG, "CaptureCallback.onCaptureBufferLost()");
+                    }
+                };
         try {
             captureSession.stopRepeating();
             captureSession.abortCaptures();
