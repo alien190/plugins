@@ -263,6 +263,8 @@ class CameraController extends ValueNotifier<CameraValue> {
   StreamSubscription<dynamic>? _imageStreamSubscription;
   FutureOr<bool>? _initCalled;
   StreamSubscription? _deviceOrientationSubscription;
+  StreamSubscription? _cameraClosingSubscription;
+  StreamSubscription? _cameraErrorSubscription;
 
   /// Checks whether [CameraController.dispose] has completed successfully.
   ///
@@ -330,11 +332,32 @@ class CameraController extends ValueNotifier<CameraValue> {
         focusPointSupported: await _initializeCompleter.future
             .then((event) => event.focusPointSupported),
       );
+
+      _cameraClosingSubscription =
+          CameraPlatform.instance.onCameraClosing(cameraId).listen(
+                (e) => _setCameraIsNotInit('onCameraClosing event received'),
+              );
+
+      _cameraErrorSubscription =
+          CameraPlatform.instance.onCameraError(cameraId).listen(
+                (e) => _setCameraIsNotInit(
+                  'onCameraError event received: ${e.description}',
+                ),
+              );
     } on PlatformException catch (e) {
       throw CameraException(e.code, e.message);
     }
 
     _initCalled = true;
+  }
+
+  void _setCameraIsNotInit(String errorDescription) {
+    if (!_isDisposed) {
+      value = value.copyWith(
+        isInitialized: false,
+        errorDescription: errorDescription,
+      );
+    }
   }
 
   /// Prepare the capture session for video recording.
@@ -812,6 +835,8 @@ class CameraController extends ValueNotifier<CameraValue> {
       return;
     }
     unawaited(_deviceOrientationSubscription?.cancel());
+    unawaited(_cameraErrorSubscription?.cancel());
+    unawaited(_cameraClosingSubscription?.cancel());
     _isDisposed = true;
     super.dispose();
     if (_initCalled != null) {
