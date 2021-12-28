@@ -672,12 +672,12 @@ class Camera
      */
     public void stopBackgroundThread() {
         if (backgroundHandlerThread != null) {
-            backgroundHandlerThread.quitSafely();
-            try {
-                backgroundHandlerThread.join();
-            } catch (Exception e) {
-                dartMessenger.error(flutterResult, "cameraAccess", e.getMessage(), null);
-            }
+            backgroundHandlerThread.quit();
+//            try {
+//                backgroundHandlerThread.join();
+//            } catch (Exception e) {
+//                dartMessenger.error(flutterResult, "cameraAccess", e.getMessage(), null);
+//            }
         }
         backgroundHandlerThread = null;
         backgroundHandler = null;
