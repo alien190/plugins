@@ -469,6 +469,7 @@ class Camera
                     TAG,
                     "refreshPreviewCaptureSession: captureSession not yet initialized, "
                             + "skipping preview capture session refresh.");
+            onErrorCallback.onError("refreshPreviewCaptureSession", "captureSession not yet initialized");
             return;
         }
 
@@ -483,9 +484,9 @@ class Camera
             }
 
         } catch (IllegalStateException e) {
-            onErrorCallback.onError("cameraAccess", "Camera is closed: " + e.getMessage());
+            onErrorCallback.onError("refreshPreviewCaptureSession", "Camera is closed: " + e.getMessage());
         } catch (Exception e) {
-            onErrorCallback.onError("cameraAccess", e.getMessage());
+            onErrorCallback.onError("refreshPreviewCaptureSession", e.getMessage());
         }
     }
 
