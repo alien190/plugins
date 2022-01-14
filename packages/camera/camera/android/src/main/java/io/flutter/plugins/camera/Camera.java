@@ -15,7 +15,9 @@ import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
+import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.OutputConfiguration;
 import android.hardware.camera2.params.SessionConfiguration;
@@ -292,7 +294,7 @@ class Camera
                                     cameraFeatures.getAutoFocus().getValue(),
                                     cameraFeatures.getExposurePoint().checkIsSupported(),
                                     cameraFeatures.getFocusPoint().checkIsSupported());
-                        } catch (CameraAccessException e) {
+                        } catch (Exception e) {
                             dartMessenger.sendCameraErrorEvent(e.getMessage());
                             close();
                         }
@@ -467,6 +469,7 @@ class Camera
                     TAG,
                     "refreshPreviewCaptureSession: captureSession not yet initialized, "
                             + "skipping preview capture session refresh.");
+            onErrorCallback.onError("refreshPreviewCaptureSession", "captureSession not yet initialized");
             return;
         }
 
@@ -481,9 +484,9 @@ class Camera
             }
 
         } catch (IllegalStateException e) {
-            onErrorCallback.onError("cameraAccess", "Camera is closed: " + e.getMessage());
-        } catch (CameraAccessException e) {
-            onErrorCallback.onError("cameraAccess", e.getMessage());
+            onErrorCallback.onError("refreshPreviewCaptureSession", "Camera is closed: " + e.getMessage());
+        } catch (Exception e) {
+            onErrorCallback.onError("refreshPreviewCaptureSession", e.getMessage());
         }
     }
 
@@ -502,7 +505,7 @@ class Camera
         try {
             captureFile = File.createTempFile("CAP", ".jpg", outputDir);
             captureTimeouts.reset();
-        } catch (IOException | SecurityException e) {
+        } catch (Exception e) {
             dartMessenger.error(flutterResult, "cannotCreateFile", e.getMessage(), null);
             return;
         }
@@ -549,7 +552,7 @@ class Camera
             captureSession.capture(
                     previewRequestBuilder.build(), cameraCaptureCallback, backgroundHandler);
 
-        } catch (CameraAccessException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -569,7 +572,7 @@ class Camera
         CaptureRequest.Builder stillBuilder;
         try {
             stillBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
-        } catch (CameraAccessException e) {
+        } catch (Exception e) {
             dartMessenger.error(flutterResult, "cameraAccess", e.getMessage(), null);
             return;
         }
@@ -579,7 +582,7 @@ class Camera
         stillBuilder.set(
                 CaptureRequest.SCALER_CROP_REGION,
                 previewRequestBuilder.get(CaptureRequest.SCALER_CROP_REGION));
-
+        
         // Have all features update the builder.
         updateBuilderSettings(stillBuilder);
 
@@ -600,16 +603,45 @@ class Camera
                             @NonNull CameraCaptureSession session,
                             @NonNull CaptureRequest request,
                             @NonNull TotalCaptureResult result) {
+                        Log.i(TAG, "CaptureCallback.onCaptureCompleted()");
                         unlockAutoFocus();
                     }
-                };
 
+                    @Override
+                    public void onCaptureStarted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, long timestamp, long frameNumber) {
+                        Log.i(TAG, "CaptureCallback.onCaptureStarted()");
+                    }
+
+                    @Override
+                    public void onCaptureProgressed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull CaptureResult partialResult) {
+                        Log.i(TAG, "CaptureCallback.onCaptureProgressed()");
+                    }
+
+                    @Override
+                    public void onCaptureFailed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull CaptureFailure failure) {
+                        Log.i(TAG, "CaptureCallback.onCaptureFailed(), reason:" + failure.getReason());
+                    }
+
+                    @Override
+                    public void onCaptureSequenceCompleted(@NonNull CameraCaptureSession session, int sequenceId, long frameNumber) {
+                        Log.i(TAG, "CaptureCallback.onCaptureSequenceCompleted()");
+                    }
+
+                    @Override
+                    public void onCaptureSequenceAborted(@NonNull CameraCaptureSession session, int sequenceId) {
+                        Log.i(TAG, "CaptureCallback.onCaptureSequenceAborted()");
+                    }
+
+                    @Override
+                    public void onCaptureBufferLost(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull Surface target, long frameNumber) {
+                        Log.i(TAG, "CaptureCallback.onCaptureBufferLost()");
+                    }
+                };
         try {
             captureSession.stopRepeating();
-            captureSession.abortCaptures();
             Log.i(TAG, "sending capture request");
             captureSession.capture(stillBuilder.build(), captureCallback, backgroundHandler);
-        } catch (CameraAccessException e) {
+        } catch (Exception e) {
             dartMessenger.error(flutterResult, "cameraAccess", e.getMessage(), null);
         }
     }
@@ -630,7 +662,7 @@ class Camera
         backgroundHandlerThread = HandlerThreadFactory.create("CameraBackground");
         try {
             backgroundHandlerThread.start();
-        } catch (IllegalThreadStateException e) {
+        } catch (Exception e) {
             // Ignore exception in case the thread has already started.
         }
         backgroundHandler = HandlerFactory.create(backgroundHandlerThread.getLooper());
@@ -641,12 +673,12 @@ class Camera
      */
     public void stopBackgroundThread() {
         if (backgroundHandlerThread != null) {
-            backgroundHandlerThread.quitSafely();
-            try {
-                backgroundHandlerThread.join();
-            } catch (InterruptedException e) {
-                dartMessenger.error(flutterResult, "cameraAccess", e.getMessage(), null);
-            }
+            backgroundHandlerThread.quit();
+//            try {
+//                backgroundHandlerThread.join();
+//            } catch (Exception e) {
+//                dartMessenger.error(flutterResult, "cameraAccess", e.getMessage(), null);
+//            }
         }
         backgroundHandlerThread = null;
         backgroundHandler = null;
@@ -675,7 +707,7 @@ class Camera
 
         try {
             captureSession.capture(previewRequestBuilder.build(), null, backgroundHandler);
-        } catch (CameraAccessException e) {
+        } catch (Exception e) {
             dartMessenger.sendCameraErrorEvent(e.getMessage());
         }
     }
@@ -700,7 +732,7 @@ class Camera
                     CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_IDLE);
 
             captureSession.capture(previewRequestBuilder.build(), null, backgroundHandler);
-        } catch (CameraAccessException e) {
+        } catch (Exception e) {
             dartMessenger.sendCameraErrorEvent(e.getMessage());
             return;
         }
@@ -715,13 +747,13 @@ class Camera
         final File outputDir = applicationContext.getCacheDir();
         try {
             captureFile = File.createTempFile("REC", ".mp4", outputDir);
-        } catch (IOException | SecurityException e) {
+        } catch (Exception e) {
             result.error("cannotCreateFile", e.getMessage(), null);
             return;
         }
         try {
             prepareMediaRecorder(captureFile.getAbsolutePath());
-        } catch (IOException e) {
+        } catch (Exception e) {
             recordingVideo = false;
             captureFile = null;
             result.error("videoRecordingFailed", e.getMessage(), null);
@@ -735,7 +767,7 @@ class Camera
             createCaptureSession(
                     CameraDevice.TEMPLATE_RECORD, () -> mediaRecorder.start(), mediaRecorder.getSurface());
             result.success(null);
-        } catch (CameraAccessException e) {
+        } catch (Exception e) {
             recordingVideo = false;
             captureFile = null;
             result.error("videoRecordingFailed", e.getMessage(), null);
@@ -754,13 +786,13 @@ class Camera
         try {
             captureSession.abortCaptures();
             mediaRecorder.stop();
-        } catch (CameraAccessException | IllegalStateException e) {
+        } catch (Exception e) {
             // Ignore exceptions and try to continue (changes are camera session already aborted capture).
         }
         mediaRecorder.reset();
         try {
             startPreview();
-        } catch (CameraAccessException | IllegalStateException e) {
+        } catch (Exception e) {
             result.error("videoRecordingFailed", e.getMessage(), null);
             return;
         }
@@ -781,7 +813,7 @@ class Camera
                 result.error("videoRecordingFailed", "pauseVideoRecording requires Android API +24.", null);
                 return;
             }
-        } catch (IllegalStateException e) {
+        } catch (Exception e) {
             result.error("videoRecordingFailed", e.getMessage(), null);
             return;
         }
@@ -803,7 +835,7 @@ class Camera
                         "videoRecordingFailed", "resumeVideoRecording requires Android API +24.", null);
                 return;
             }
-        } catch (IllegalStateException e) {
+        } catch (Exception e) {
             result.error("videoRecordingFailed", e.getMessage(), null);
             return;
         }
@@ -915,7 +947,7 @@ class Camera
                     try {
                         captureSession.setRepeatingRequest(
                                 previewRequestBuilder.build(), null, backgroundHandler);
-                    } catch (CameraAccessException e) {
+                    } catch (Exception e) {
                         if (result != null) {
                             result.error(
                                     "setFocusModeFailed", "Error setting focus mode: " + e.getMessage(), null);

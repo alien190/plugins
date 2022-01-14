@@ -329,10 +329,14 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
                 break;
             }
             case "dispose": {
-                if (camera != null) {
-                    camera.dispose();
+                try {
+                    if (camera != null) {
+                        camera.dispose();
+                    }
+                    result.success(null);
+                } catch (Exception e) {
+                    result.error("CameraDisposeError", e.toString(), null);
                 }
-                result.success(null);
                 break;
             }
             default:
