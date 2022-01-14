@@ -14,13 +14,20 @@ import 'camera_spash.dart';
 /// A widget showing a live camera preview.
 class CameraPreview extends StatelessWidget {
   /// Creates a preview widget for the given camera controller.
-  const CameraPreview(this.controller, {this.child});
+  const CameraPreview(
+    this.controller, {
+    this.child,
+    this.takePictureProgressIndicator,
+  });
 
   /// The controller for the camera that the preview is shown for.
   final CameraController controller;
 
   /// A widget to overlay on top of the camera preview
   final Widget? child;
+
+  /// A widget to overlay when picture taking
+  final Widget? takePictureProgressIndicator;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +38,7 @@ class CameraPreview extends StatelessWidget {
             ? AnimatedContainer(
                 duration: Duration(milliseconds: 200),
                 transformAlignment: Alignment.center,
-                transform: controller.value.isTakingPicture
+                transform: controller.value.takePictureAnimation.isInProgress
                     ? (Matrix4.identity()..scale(0.95))
                     : Matrix4.identity(),
                 child: AspectRatio(
@@ -42,13 +49,17 @@ class CameraPreview extends StatelessWidget {
                     fit: StackFit.expand,
                     children: [
                       _wrapInRotatedBox(child: controller.buildPreview()),
-                      child ?? Container(),
                       CameraGrid(),
-                      CameraSplash(isShown: !controller.value.isTakingPicture),
-                      if (controller.value.isTakingPicture)
+                      CameraSplash(
+                        takePictureAnimation:
+                            controller.value.takePictureAnimation,
+                      ),
+                      if (controller.value.takePictureAnimation.isInProgress)
                         Container(color: Color.fromARGB(100, 0, 0, 0)),
-                      if (controller.value.isTakingPicture)
-                        Center(child: CircularProgressIndicator()),
+                      if (takePictureProgressIndicator != null &&
+                          controller.value.takePictureAnimation.isInProgress)
+                        Center(child: takePictureProgressIndicator),
+                      child ?? Container(),
                     ],
                   ),
                 ),

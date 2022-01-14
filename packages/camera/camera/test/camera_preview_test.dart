@@ -109,7 +109,15 @@ class FakeController extends ValueNotifier<CameraValue>
   Future<XFile> stopVideoRecording() async => XFile('');
 
   @override
-  Future<XFile> takePicture() async => XFile('');
+  Future<XFile> takePicture({
+    bool autoStartAnimation = false,
+    bool autoStopAnimation = false,
+  }) async =>
+      XFile('');
+
+  Future<void> startTakingPictureAnimation() async {}
+
+  Future<void> stopTakingPictureAnimation() async {}
 
   @override
   Future<void> unlockCaptureOrientation() async {}

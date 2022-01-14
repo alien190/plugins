@@ -1,12 +1,15 @@
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
 /// Splash animation
 class CameraSplash extends StatefulWidget {
-  final bool _isShown;
+  final TakePictureAnimationState _takePictureAnimation;
 
   /// Default constructor
-  const CameraSplash({Key? key, required bool isShown})
-      : _isShown = isShown,
+  const CameraSplash({
+    Key? key,
+    required TakePictureAnimationState takePictureAnimation,
+  })  : _takePictureAnimation = takePictureAnimation,
         super(key: key);
 
   @override
@@ -15,6 +18,8 @@ class CameraSplash extends StatefulWidget {
 
 class _CameraSplashState extends State<CameraSplash>
     with SingleTickerProviderStateMixin {
+  TakePictureAnimationState _takePictureAnimation =
+      TakePictureAnimationState.none;
   bool _isShown = false;
   late AnimationController _animationController;
   late Animation<int> _colorAnimationIn;
@@ -25,7 +30,7 @@ class _CameraSplashState extends State<CameraSplash>
   void initState() {
     _animationController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 300),
+      duration: Duration(milliseconds: 400),
     );
 
     _colorAnimationIn = IntTween(begin: 0, end: 255).animate(
@@ -67,17 +72,26 @@ class _CameraSplashState extends State<CameraSplash>
   @override
   void didUpdateWidget(covariant CameraSplash oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _showSplash(widget._isShown);
+    _handleAnimationState(widget._takePictureAnimation);
   }
 
-  void _showSplash(bool isShown) {
-    if (!_isShown && isShown) {
+  void _handleAnimationState(TakePictureAnimationState takePictureAnimation) {
+    if (_takePictureAnimation.isInProgress &&
+        takePictureAnimation.isStopped &&
+        !_isShown) {
       _isShown = true;
+      _takePictureAnimation = TakePictureAnimationState.stopped;
       _animationController.forward(from: 0).then((_) {
         _isShown = false;
         if (mounted) setState(() {});
       });
       if (mounted) setState(() {});
+    }
+
+    if (!_takePictureAnimation.isInProgress &&
+        takePictureAnimation.isInProgress &&
+        !_isShown) {
+      _takePictureAnimation = TakePictureAnimationState.inProgress;
     }
   }
 
@@ -112,17 +126,3 @@ class _CameraSplashState extends State<CameraSplash>
     super.dispose();
   }
 }
-//return _isShown
-//     ? TweenAnimationBuilder<int>(
-//         tween: IntTween(begin: 0, end: 255),
-//         duration: Duration(milliseconds: 300),
-//         curve: Curves.easeOutCirc,
-//         builder: (_, int value, __) => Container(
-//           color: Color.fromARGB(value, value, value, value),
-//         ),
-//         onEnd: () {
-//           _isShown = false;
-//           if (mounted) setState(() {});
-//         },
-//       )
-//     : Container(color: Colors.transparent);

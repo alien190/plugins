@@ -195,6 +195,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
         onPointerUp: (_) => _pointers--,
         child: CameraPreview(
           controller!,
+          takePictureProgressIndicator: CircularProgressIndicator(),
           child: LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
             return GestureDetector(
@@ -1054,10 +1055,12 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     }
 
     try {
-      XFile file = await cameraController.takePicture();
+      XFile file = await cameraController.takePicture(autoStartAnimation: true);
+      await cameraController.stopTakingPictureAnimation();
       return file;
     } on CameraException catch (e) {
       _showCameraException(e);
+      await cameraController.stopTakingPictureAnimation();
       return null;
     }
   }
