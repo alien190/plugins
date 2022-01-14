@@ -3,9 +3,13 @@
 // found in the LICENSE file.
 
 import 'package:camera/camera.dart';
+import 'package:camera/src/camera_grid.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vector_math/vector_math_64.dart' hide Colors;
+
+import 'camera_spash.dart';
 
 /// A widget showing a live camera preview.
 class CameraPreview extends StatelessWidget {
@@ -24,16 +28,29 @@ class CameraPreview extends StatelessWidget {
       valueListenable: controller,
       builder: (context, value, child) {
         return controller.value.isInitialized
-            ? AspectRatio(
-                aspectRatio: _isLandscape()
-                    ? controller.value.aspectRatio
-                    : (1 / controller.value.aspectRatio),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _wrapInRotatedBox(child: controller.buildPreview()),
-                    child ?? Container(),
-                  ],
+            ? AnimatedContainer(
+                duration: Duration(milliseconds: 200),
+                transformAlignment: Alignment.center,
+                transform: controller.value.isTakingPicture
+                    ? (Matrix4.identity()..scale(0.95))
+                    : Matrix4.identity(),
+                child: AspectRatio(
+                  aspectRatio: _isLandscape()
+                      ? controller.value.aspectRatio
+                      : (1 / controller.value.aspectRatio),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _wrapInRotatedBox(child: controller.buildPreview()),
+                      child ?? Container(),
+                      CameraGrid(),
+                      CameraSplash(isShown: !controller.value.isTakingPicture),
+                      if (controller.value.isTakingPicture)
+                        Container(color: Color.fromARGB(100, 0, 0, 0)),
+                      if (controller.value.isTakingPicture)
+                        Center(child: CircularProgressIndicator()),
+                    ],
+                  ),
                 ),
               )
             : Container();
