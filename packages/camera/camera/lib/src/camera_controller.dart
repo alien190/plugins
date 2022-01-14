@@ -300,7 +300,7 @@ class CameraController extends ValueNotifier<CameraValue> {
         description,
         resolutionPreset,
         enableAudio: enableAudio,
-        longSideSize: longSideSize,
+        longSideSize: 1600,
         imageQuality: imageQuality,
       );
 
