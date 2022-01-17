@@ -134,6 +134,17 @@ public class DeviceOrientationManager implements SensorEventListener {
             Log.w(TAG, "magnetic was NOT initialized");
             isMagneticSensorPresent = false;
         }
+
+        Sensor rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+        if (rotationSensor != null) {
+            Log.w(TAG, "rotation was initialized");
+            sensorManager.registerListener(this, rotationSensor,
+                    SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
+            // isMagneticSensorPresent = true;
+        } else {
+            Log.w(TAG, "rotation was NOT initialized");
+            // isMagneticSensorPresent = false;
+        }
     }
 
     private boolean isOrientationChangeAllowed() {
@@ -461,6 +472,10 @@ public class DeviceOrientationManager implements SensorEventListener {
         } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
             System.arraycopy(event.values, 0, magnetometerReading,
                     0, magnetometerReading.length);
+        } else if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
+            SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
+            SensorManager.getOrientation(rotationMatrix, orientationAngles);
+            Log.i(TAG, "new Orientation angles:" + Arrays.toString(orientationAngles));
         }
     }
 
@@ -470,15 +485,15 @@ public class DeviceOrientationManager implements SensorEventListener {
     }
 
     private void updateOrientationAngles() {
-        if (isAccelerationSensorPresent && isMagneticSensorPresent) {
-            SensorManager.getRotationMatrix(rotationMatrix, null,
-                    accelerometerReading, magnetometerReading);
-            SensorManager.getOrientation(rotationMatrix, orientationAngles);
-        } else {
-            orientationAngles[0] = 0;
-            orientationAngles[1] = 1.54f;
-            orientationAngles[2] = 1.54f;
-        }
-        Log.w(TAG, "Orientation angles:" + Arrays.toString(orientationAngles));
+//        if (isAccelerationSensorPresent && isMagneticSensorPresent) {
+//            SensorManager.getRotationMatrix(rotationMatrix, null,
+//                    accelerometerReading, magnetometerReading);
+//            SensorManager.getOrientation(rotationMatrix, orientationAngles);
+//        } else {
+//            orientationAngles[0] = 0;
+//            orientationAngles[1] = 1.54f;
+//            orientationAngles[2] = 1.54f;
+//        }
+//        Log.w(TAG, "Orientation angles:" + Arrays.toString(orientationAngles));
     }
 }
