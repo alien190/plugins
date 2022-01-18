@@ -25,7 +25,9 @@ public class DartMessenger {
   /** Specifies the different device related message types. */
   enum DeviceEventType {
     /** Indicates the device's orientation has changed. */
-    ORIENTATION_CHANGED("orientation_changed");
+    ORIENTATION_CHANGED("orientation_changed"),
+    TILTS_CHANGED("tilts_changed");
+
     private final String method;
 
     DeviceEventType(String method) {
@@ -85,7 +87,25 @@ public class DartMessenger {
         });
   }
 
-  /**
+    /**
+     * Sends a message to the Flutter client informing the orientation angles of the device has been changed.
+     *
+     * @param horizontalTilt specifies the new horizontal tilt of the device.
+     * @param verticalTilt specifies the new vertical tilt of the device.
+     */
+    public void sendDeviceTiltsChangeEvent(int horizontalTilt, int verticalTilt) {
+        this.send(
+                DeviceEventType.TILTS_CHANGED,
+                new HashMap<String, Object>() {
+                    {
+                        put("horizontalTilt", horizontalTilt);
+                        put("verticalTilt", verticalTilt);
+                    }
+                });
+    }
+
+
+    /**
    * Sends a message to the Flutter client informing that the camera has been initialized.
    *
    * @param previewWidth describes the preview width that is supported by the camera.

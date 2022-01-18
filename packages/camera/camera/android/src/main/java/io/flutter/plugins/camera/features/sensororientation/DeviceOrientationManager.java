@@ -56,6 +56,8 @@ public class DeviceOrientationManager implements SensorEventListener {
 
     private boolean isAccelerationSensorPresent;
     private boolean isMagneticSensorPresent;
+    private boolean isRotationVectorSensorPresent;
+    private int lastHorizontalTilt = 0;
 
 
     /**
@@ -98,6 +100,18 @@ public class DeviceOrientationManager implements SensorEventListener {
 
     private void startSensorListener() {
         if (orientationEventListener != null) return;
+
+        Sensor rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+        if (rotationSensor != null) {
+            Log.i(TAG, "Rotation sensor has been initialized");
+            sensorManager.registerListener(this, rotationSensor,
+                    SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
+            isRotationVectorSensorPresent = true;
+        } else {
+            Log.w(TAG, "Rotation sensor has NOT been initialized");
+            isRotationVectorSensorPresent = false;
+        }
+
         orientationEventListener =
                 new OrientationEventListener(activity, SensorManager.SENSOR_DELAY_NORMAL) {
                     @Override
@@ -108,47 +122,26 @@ public class DeviceOrientationManager implements SensorEventListener {
                             lastOrientation = newOrientation;
                             messenger.sendDeviceOrientationChangeEvent(newOrientation);
                         }
+                        if (!isRotationVectorSensorPresent && lastHorizontalTilt != angle) {
+                            lastHorizontalTilt = angle;
+                            messenger.sendDeviceTiltsChangeEvent(
+                                    lastHorizontalTilt,
+                                    OrientationEventListener.ORIENTATION_UNKNOWN
+                            );
+                        }
                     }
                 };
         if (orientationEventListener.canDetectOrientation()) {
             orientationEventListener.enable();
-        }
-
-        Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        if (accelerometer != null) {
-            Log.w(TAG, "accelerometer was initialized");
-            sensorManager.registerListener(this, accelerometer,
-                    SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
-            isAccelerationSensorPresent = true;
-        } else {
-            Log.w(TAG, "accelerometer was NOT initialized");
-            isAccelerationSensorPresent = false;
-        }
-        Sensor magneticField = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
-        if (magneticField != null) {
-            Log.w(TAG, "magnetic was initialized");
-            sensorManager.registerListener(this, magneticField,
-                    SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
-            isMagneticSensorPresent = true;
-        } else {
-            Log.w(TAG, "magnetic was NOT initialized");
-            isMagneticSensorPresent = false;
-        }
-
-        Sensor rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
-        if (rotationSensor != null) {
-            Log.w(TAG, "rotation was initialized");
-            sensorManager.registerListener(this, rotationSensor,
-                    SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
-            // isMagneticSensorPresent = true;
-        } else {
-            Log.w(TAG, "rotation was NOT initialized");
-            // isMagneticSensorPresent = false;
+        } else if (!isRotationVectorSensorPresent) {
+            messenger.sendDeviceTiltsChangeEvent(
+                    OrientationEventListener.ORIENTATION_UNKNOWN,
+                    OrientationEventListener.ORIENTATION_UNKNOWN
+            );
         }
     }
 
     private boolean isOrientationChangeAllowed() {
-        updateOrientationAngles();
         return orientationAngles[1] >= 0.7 ||
                 orientationAngles[1] <= -0.7 ||
                 orientationAngles[2] >= 0.7 ||
@@ -466,34 +459,22 @@ public class DeviceOrientationManager implements SensorEventListener {
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            System.arraycopy(event.values, 0, accelerometerReading,
-                    0, accelerometerReading.length);
-        } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
-            System.arraycopy(event.values, 0, magnetometerReading,
-                    0, magnetometerReading.length);
-        } else if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
+        if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
             SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
             SensorManager.getOrientation(rotationMatrix, orientationAngles);
             Log.i(TAG, "new Orientation angles:" + Arrays.toString(orientationAngles));
+            final int horizontalTilt = Math.round((float) (orientationAngles[0] * 180 / 3.1415));
+            if (lastHorizontalTilt != horizontalTilt) {
+                lastHorizontalTilt = horizontalTilt;
+                messenger.sendDeviceTiltsChangeEvent(
+                        horizontalTilt,
+                        OrientationEventListener.ORIENTATION_UNKNOWN
+                );
+            }
         }
     }
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int i) {
-
-    }
-
-    private void updateOrientationAngles() {
-//        if (isAccelerationSensorPresent && isMagneticSensorPresent) {
-//            SensorManager.getRotationMatrix(rotationMatrix, null,
-//                    accelerometerReading, magnetometerReading);
-//            SensorManager.getOrientation(rotationMatrix, orientationAngles);
-//        } else {
-//            orientationAngles[0] = 0;
-//            orientationAngles[1] = 1.54f;
-//            orientationAngles[2] = 1.54f;
-//        }
-//        Log.w(TAG, "Orientation angles:" + Arrays.toString(orientationAngles));
     }
 }
