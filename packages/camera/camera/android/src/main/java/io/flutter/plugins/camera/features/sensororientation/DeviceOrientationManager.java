@@ -457,7 +457,7 @@ public class DeviceOrientationManager implements SensorEventListener {
 
     private void sendDeviceTiltsChangeEvent() {
         Log.d(TAG, "Device tilts. Horizontal:" + lastHorizontalTilt + ", vertical:" + lastVerticalTilt);
-        messenger.sendDeviceTiltsChangeEvent(lastHorizontalTilt, lastVerticalTilt);
+        messenger.sendDeviceTiltsChangeEvent(lastHorizontalTilt, lastVerticalTilt, lastOrientation);
     }
 
     @Override

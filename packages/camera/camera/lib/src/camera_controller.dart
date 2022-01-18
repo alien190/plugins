@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:camera/camera.dart';
+import 'package:camera/src/camera_device_tilts.dart';
 import 'package:camera_platform_interface/camera_platform_interface.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -875,4 +876,12 @@ class CameraController extends ValueNotifier<CameraValue> {
       super.removeListener(listener);
     }
   }
+
+  // Stream<CameraDeviceTilts> getDeviceTilts() {
+  //   return CameraPlatform.instance
+  //       .onDeviceTiltsChanged()
+  //       .map((DeviceTiltsChangedEvent event) => CameraDeviceTilts(
+  //     deviceOrientation: event.
+  //   ));
+  // }
 }

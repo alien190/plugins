@@ -93,13 +93,16 @@ public class DartMessenger {
      * @param horizontalTilt specifies the new horizontal tilt of the device.
      * @param verticalTilt specifies the new vertical tilt of the device.
      */
-    public void sendDeviceTiltsChangeEvent(int horizontalTilt, int verticalTilt) {
+    public void sendDeviceTiltsChangeEvent(int horizontalTilt,
+                                           int verticalTilt,
+                                           PlatformChannel.DeviceOrientation orientation) {
         this.send(
                 DeviceEventType.TILTS_CHANGED,
                 new HashMap<String, Object>() {
                     {
                         put("horizontalTilt", horizontalTilt);
                         put("verticalTilt", verticalTilt);
+                        put("orientation", CameraUtils.serializeDeviceOrientation(orientation));
                     }
                 });
     }
