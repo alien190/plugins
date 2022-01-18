@@ -5,6 +5,7 @@
 import 'dart:async';
 
 import 'package:camera/camera.dart';
+import 'package:camera/src/camera_device_tilts.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -133,6 +134,9 @@ class FakeController extends ValueNotifier<CameraValue>
 
   @override
   int get longSideSize => 1600;
+
+  @override
+  Stream<CameraDeviceTilts> getDeviceTilts() => Stream.fromIterable([]);
 }
 
 void main() {

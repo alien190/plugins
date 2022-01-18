@@ -1,10 +1,9 @@
 import 'package:flutter/services.dart';
-import 'package:quiver/core.dart';
 
 /// Device tilts model
 class CameraDeviceTilts {
   /// Locked capture orientation
-  final Optional<DeviceOrientation>? lockedCaptureOrientation;
+  final DeviceOrientation? lockedCaptureOrientation;
 
   /// Current device orientation
   final DeviceOrientation deviceOrientation;
@@ -22,4 +21,21 @@ class CameraDeviceTilts {
     required this.horizontalTilt,
     required this.verticalTilt,
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CameraDeviceTilts &&
+          runtimeType == other.runtimeType &&
+          lockedCaptureOrientation == other.lockedCaptureOrientation &&
+          deviceOrientation == other.deviceOrientation &&
+          horizontalTilt == other.horizontalTilt &&
+          verticalTilt == other.verticalTilt;
+
+  @override
+  int get hashCode =>
+      lockedCaptureOrientation.hashCode ^
+      deviceOrientation.hashCode ^
+      horizontalTilt.hashCode ^
+      verticalTilt.hashCode;
 }

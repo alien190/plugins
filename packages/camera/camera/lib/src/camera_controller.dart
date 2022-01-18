@@ -877,11 +877,15 @@ class CameraController extends ValueNotifier<CameraValue> {
     }
   }
 
-  // Stream<CameraDeviceTilts> getDeviceTilts() {
-  //   return CameraPlatform.instance
-  //       .onDeviceTiltsChanged()
-  //       .map((DeviceTiltsChangedEvent event) => CameraDeviceTilts(
-  //     deviceOrientation: event.
-  //   ));
-  // }
+  /// Returns device tilts stream
+  Stream<CameraDeviceTilts> getDeviceTilts() {
+    return CameraPlatform.instance
+        .onDeviceTiltsChanged()
+        .map((DeviceTiltsChangedEvent event) => CameraDeviceTilts(
+              deviceOrientation: event.orientation,
+              verticalTilt: event.verticalTilt,
+              horizontalTilt: event.horizontalTilt,
+              lockedCaptureOrientation: value.lockedCaptureOrientation,
+            ));
+  }
 }
