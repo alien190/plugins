@@ -16,7 +16,6 @@ class CameraPreview extends StatelessWidget {
   const CameraPreview(
     this.controller, {
     this.child,
-    this.takePictureProgressIndicator,
   });
 
   /// The controller for the camera that the preview is shown for.
@@ -24,9 +23,6 @@ class CameraPreview extends StatelessWidget {
 
   /// A widget to overlay on top of the camera preview
   final Widget? child;
-
-  /// A widget to overlay when picture taking
-  final Widget? takePictureProgressIndicator;
 
   @override
   Widget build(BuildContext context) {
