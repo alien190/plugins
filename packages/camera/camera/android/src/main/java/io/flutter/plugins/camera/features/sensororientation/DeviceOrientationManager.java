@@ -48,17 +48,11 @@ public class DeviceOrientationManager implements SensorEventListener {
     private OrientationEventListener orientationEventListener;
     private final SensorManager sensorManager;
 
-    private final float[] accelerometerReading = new float[3];
-    private final float[] magnetometerReading = new float[3];
-
     private final float[] rotationMatrix = new float[9];
     private final float[] orientationAngles = new float[3];
-
-    private boolean isAccelerationSensorPresent;
-    private boolean isMagneticSensorPresent;
     private boolean isRotationVectorSensorPresent;
-    private int lastHorizontalTilt = 0;
-
+    private int lastHorizontalTilt = -1;
+    private int lastVerticalTilt = -1;
 
     /**
      * Factory method to create a device orientation manager.
@@ -84,8 +78,6 @@ public class DeviceOrientationManager implements SensorEventListener {
         orientationAngles[0] = 0;
         orientationAngles[1] = 1.54f;
         orientationAngles[2] = 1.54f;
-        isAccelerationSensorPresent = false;
-        isMagneticSensorPresent = false;
     }
 
     public void start() {
@@ -116,28 +108,21 @@ public class DeviceOrientationManager implements SensorEventListener {
                 new OrientationEventListener(activity, SensorManager.SENSOR_DELAY_NORMAL) {
                     @Override
                     public void onOrientationChanged(int angle) {
+                        Log.d(TAG, "Orientation changed event angle:" + angle);
                         PlatformChannel.DeviceOrientation newOrientation = calculateSensorOrientation(angle);
                         if (!newOrientation.equals(lastOrientation) && isOrientationChangeAllowed()) {
                             Log.d(TAG, "sensor orientation set:" + newOrientation.toString());
                             lastOrientation = newOrientation;
                             messenger.sendDeviceOrientationChangeEvent(newOrientation);
                         }
-                        if (!isRotationVectorSensorPresent && lastHorizontalTilt != angle) {
+                        if (lastHorizontalTilt != angle) {
                             lastHorizontalTilt = angle;
-                            messenger.sendDeviceTiltsChangeEvent(
-                                    lastHorizontalTilt,
-                                    OrientationEventListener.ORIENTATION_UNKNOWN
-                            );
+                            sendDeviceTiltsChangeEvent();
                         }
                     }
                 };
         if (orientationEventListener.canDetectOrientation()) {
             orientationEventListener.enable();
-        } else if (!isRotationVectorSensorPresent) {
-            messenger.sendDeviceTiltsChangeEvent(
-                    OrientationEventListener.ORIENTATION_UNKNOWN,
-                    OrientationEventListener.ORIENTATION_UNKNOWN
-            );
         }
     }
 
@@ -462,16 +447,17 @@ public class DeviceOrientationManager implements SensorEventListener {
         if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
             SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
             SensorManager.getOrientation(rotationMatrix, orientationAngles);
-            Log.i(TAG, "new Orientation angles:" + Arrays.toString(orientationAngles));
-            final int horizontalTilt = Math.round((float) (orientationAngles[0] * 180 / 3.1415));
-            if (lastHorizontalTilt != horizontalTilt) {
-                lastHorizontalTilt = horizontalTilt;
-                messenger.sendDeviceTiltsChangeEvent(
-                        horizontalTilt,
-                        OrientationEventListener.ORIENTATION_UNKNOWN
-                );
+            final int verticalTilt = Math.round((float) (orientationAngles[1] * 180 / 3.1415));
+            if (lastVerticalTilt != verticalTilt) {
+                lastVerticalTilt = verticalTilt;
+                sendDeviceTiltsChangeEvent();
             }
         }
+    }
+
+    private void sendDeviceTiltsChangeEvent() {
+        Log.d(TAG, "Device tilts. Horizontal:" + lastHorizontalTilt + ", vertical:" + lastVerticalTilt);
+        messenger.sendDeviceTiltsChangeEvent(lastHorizontalTilt, lastVerticalTilt);
     }
 
     @Override
