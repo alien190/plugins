@@ -49,7 +49,6 @@ class CameraValue {
     this.recordingOrientation,
     this.isPreviewPaused = false,
     this.previewPauseOrientation,
-    this.takePictureAnimation = TakePictureAnimationState.none,
   }) : _isRecordingPaused = isRecordingPaused;
 
   /// Creates a new camera controller state for an uninitialized controller.
@@ -67,7 +66,6 @@ class CameraValue {
           focusPointSupported: false,
           deviceOrientation: DeviceOrientation.portraitUp,
           isPreviewPaused: false,
-          takePictureAnimation: TakePictureAnimationState.none,
         );
 
   /// True after [CameraController.initialize] has completed successfully.
@@ -141,9 +139,6 @@ class CameraValue {
   /// The orientation of the currently running video recording.
   final DeviceOrientation? recordingOrientation;
 
-  /// Take picture animation state
-  final TakePictureAnimationState takePictureAnimation;
-
   /// Creates a modified copy of the object.
   ///
   /// Explicitly specified fields get the specified value, all other fields get
@@ -166,7 +161,6 @@ class CameraValue {
     Optional<DeviceOrientation>? recordingOrientation,
     bool? isPreviewPaused,
     Optional<DeviceOrientation>? previewPauseOrientation,
-    TakePictureAnimationState? takePictureAnimation,
   }) {
     return CameraValue(
       isInitialized: isInitialized ?? this.isInitialized,
@@ -193,7 +187,6 @@ class CameraValue {
       previewPauseOrientation: previewPauseOrientation == null
           ? this.previewPauseOrientation
           : previewPauseOrientation.orNull,
-      takePictureAnimation: takePictureAnimation ?? this.takePictureAnimation,
     );
   }
 
@@ -214,7 +207,6 @@ class CameraValue {
         'lockedCaptureOrientation: $lockedCaptureOrientation, '
         'recordingOrientation: $recordingOrientation, '
         'isPreviewPaused: $isPreviewPaused, '
-        'takePictureAnimation: $takePictureAnimation, '
         'previewPausedOrientation: $previewPauseOrientation)';
   }
 }
@@ -415,10 +407,7 @@ class CameraController extends ValueNotifier<CameraValue> {
   /// Captures an image and returns the file where it was saved.
   ///
   /// Throws a [CameraException] if the capture fails.
-  Future<XFile> takePicture({
-    bool autoStartAnimation = false,
-    bool autoStopAnimation = false,
-  }) async {
+  Future<XFile> takePicture() async {
     _throwIfNotInitialized("takePicture");
     if (value.isTakingPicture) {
       throw CameraException(
@@ -429,38 +418,18 @@ class CameraController extends ValueNotifier<CameraValue> {
     try {
       value = value.copyWith(
         isTakingPicture: true,
-        takePictureAnimation:
-            autoStartAnimation ? TakePictureAnimationState.inProgress : null,
       );
       XFile file = await CameraPlatform.instance.takePicture(_cameraId);
       value = value.copyWith(
         isTakingPicture: false,
-        takePictureAnimation:
-            autoStopAnimation ? TakePictureAnimationState.stopped : null,
       );
       return file;
     } on PlatformException catch (e) {
       value = value.copyWith(
         isTakingPicture: false,
-        takePictureAnimation:
-            autoStopAnimation ? TakePictureAnimationState.stopped : null,
       );
       throw CameraException(e.code, e.message);
     }
-  }
-
-  /// Manual start taking picture animation
-  Future<void> startTakingPictureAnimation() async {
-    value = value.copyWith(
-      takePictureAnimation: TakePictureAnimationState.inProgress,
-    );
-  }
-
-  /// Manual stop taking picture animation
-  Future<void> stopTakingPictureAnimation() async {
-    value = value.copyWith(
-      takePictureAnimation: TakePictureAnimationState.stopped,
-    );
   }
 
   /// Start streaming images from platform camera.
@@ -906,28 +875,4 @@ class CameraController extends ValueNotifier<CameraValue> {
       super.removeListener(listener);
     }
   }
-}
-
-/// Take picture animation status
-enum TakePictureAnimationState {
-  /// none - at initialization
-  none,
-
-  /// in progress
-  inProgress,
-
-  /// stopped
-  stopped,
-}
-
-/// boolean extension
-extension BoolTakePictureAnimationState on TakePictureAnimationState {
-  /// isNone
-  bool get isNone => this == TakePictureAnimationState.none;
-
-  /// isInProgress
-  bool get isInProgress => this == TakePictureAnimationState.inProgress;
-
-  /// isStopped
-  bool get isStopped => this == TakePictureAnimationState.stopped;
 }

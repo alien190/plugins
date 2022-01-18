@@ -1055,12 +1055,10 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     }
 
     try {
-      XFile file = await cameraController.takePicture(autoStartAnimation: true);
-      await cameraController.stopTakingPictureAnimation();
+      XFile file = await cameraController.takePicture();
       return file;
     } on CameraException catch (e) {
       _showCameraException(e);
-      await cameraController.stopTakingPictureAnimation();
       return null;
     }
   }

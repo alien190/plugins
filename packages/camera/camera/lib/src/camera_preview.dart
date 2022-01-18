@@ -7,9 +7,8 @@ import 'package:camera/src/camera_grid.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:vector_math/vector_math_64.dart' hide Colors;
 
-import 'camera_spash.dart';
+import 'camera_take_picture_animation.dart';
 
 /// A widget showing a live camera preview.
 class CameraPreview extends StatelessWidget {
@@ -35,33 +34,19 @@ class CameraPreview extends StatelessWidget {
       valueListenable: controller,
       builder: (context, value, child) {
         return controller.value.isInitialized
-            ? AnimatedContainer(
-                duration: Duration(milliseconds: 200),
-                transformAlignment: Alignment.center,
-                transform: controller.value.takePictureAnimation.isInProgress
-                    ? (Matrix4.identity()..scale(0.95))
-                    : Matrix4.identity(),
-                child: AspectRatio(
-                  aspectRatio: _isLandscape()
-                      ? controller.value.aspectRatio
-                      : (1 / controller.value.aspectRatio),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _wrapInRotatedBox(child: controller.buildPreview()),
-                      CameraGrid(),
-                      CameraSplash(
-                        takePictureAnimation:
-                            controller.value.takePictureAnimation,
-                      ),
-                      if (controller.value.takePictureAnimation.isInProgress)
-                        Container(color: Color.fromARGB(100, 0, 0, 0)),
-                      if (takePictureProgressIndicator != null &&
-                          controller.value.takePictureAnimation.isInProgress)
-                        Center(child: takePictureProgressIndicator),
-                      child ?? Container(),
-                    ],
-                  ),
+            ? AspectRatio(
+                aspectRatio: _isLandscape()
+                    ? controller.value.aspectRatio
+                    : (1 / controller.value.aspectRatio),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _wrapInRotatedBox(child: controller.buildPreview()),
+                    CameraGrid(),
+                    if (controller.value.isTakingPicture)
+                      CameraTakePictureAnimation(),
+                    child ?? Container(),
+                  ],
                 ),
               )
             : Container();
