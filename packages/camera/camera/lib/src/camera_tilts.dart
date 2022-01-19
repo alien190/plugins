@@ -61,7 +61,7 @@ class _CameraTiltsPainter extends CustomPainter {
       textAlign: TextAlign.center,
     );
     textPainter.layout();
-    textPainter.paint(canvas, Offset(size.width / 2, size.height / 2));
+    textPainter.paint(canvas, Offset.zero);
   }
 
   @override
