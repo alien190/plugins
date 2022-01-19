@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'camera_take_picture_animation.dart';
+import 'camera_tilts.dart';
 
 /// A widget showing a live camera preview.
 class CameraPreview extends StatelessWidget {
@@ -39,6 +40,7 @@ class CameraPreview extends StatelessWidget {
                   children: [
                     _wrapInRotatedBox(child: controller.buildPreview()),
                     CameraGrid(),
+                    CameraTilts(cameraController: controller),
                     if (controller.value.isTakingPicture)
                       CameraTakePictureAnimation(),
                     child ?? Container(),
