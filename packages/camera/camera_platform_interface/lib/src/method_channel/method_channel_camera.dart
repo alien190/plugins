@@ -479,11 +479,15 @@ class MethodChannelCamera extends CameraPlatform {
             deserializeDeviceOrientation(call.arguments['orientation'])));
         break;
       case 'tilts_changed':
-        deviceEventStreamController.add(
-          DeviceTiltsChangedEvent.fromJson(
-            Map<String, dynamic>.from(call.arguments),
-          ),
-        );
+        try {
+          deviceEventStreamController.add(
+            DeviceTiltsChangedEvent.fromJson(
+              Map<String, dynamic>.from(call.arguments),
+            ),
+          );
+        } catch (e) {
+          // ignore
+        }
         break;
       default:
         throw MissingPluginException();
