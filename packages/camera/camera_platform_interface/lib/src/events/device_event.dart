@@ -71,7 +71,7 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
 
   /// Converts the supplied [Map] to an instance of the [DeviceTiltsChangedEvent]
   /// class.
-  DeviceTiltsChangedEvent.fromJson(Map<String, dynamic> json)
+  DeviceTiltsChangedEvent.fromJson(Map<dynamic, dynamic> json)
       : verticalTilt = json['verticalTilt'],
         horizontalTilt = json['horizontalTilt'],
         orientation = deserializeDeviceOrientation(json['orientation']);

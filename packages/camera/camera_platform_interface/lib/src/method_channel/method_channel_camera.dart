@@ -480,8 +480,8 @@ class MethodChannelCamera extends CameraPlatform {
         break;
       case 'tilts_changed':
         try {
-          final Map<String, dynamic> map =
-              Map<String, dynamic>.from(call.arguments);
+          final Map<dynamic, dynamic> map =
+              Map<dynamic, dynamic>.from(call.arguments);
           final DeviceTiltsChangedEvent event =
               DeviceTiltsChangedEvent.fromJson(map);
           deviceEventStreamController.add(event);
