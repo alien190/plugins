@@ -50,9 +50,8 @@ public class DeviceOrientationManager implements SensorEventListener {
 
     private final float[] rotationMatrix = new float[9];
     private final float[] orientationAngles = new float[3];
-    private boolean isRotationVectorSensorPresent;
     private int lastHorizontalTilt = -1;
-    private int lastVerticalTilt = -1;
+    private double lastVerticalTilt = 0;
 
     /**
      * Factory method to create a device orientation manager.
@@ -98,10 +97,8 @@ public class DeviceOrientationManager implements SensorEventListener {
             Log.i(TAG, "Rotation sensor has been initialized");
             sensorManager.registerListener(this, rotationSensor,
                     SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
-            isRotationVectorSensorPresent = true;
         } else {
             Log.w(TAG, "Rotation sensor has NOT been initialized");
-            isRotationVectorSensorPresent = false;
         }
 
         orientationEventListener =
@@ -447,7 +444,7 @@ public class DeviceOrientationManager implements SensorEventListener {
         if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
             SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
             SensorManager.getOrientation(rotationMatrix, orientationAngles);
-            final int verticalTilt = Math.round((float) (orientationAngles[1] * 180 / 3.1415));
+            final double verticalTilt = (orientationAngles[1] * 180 / Math.PI);
             if (lastVerticalTilt != verticalTilt) {
                 lastVerticalTilt = verticalTilt;
                 sendDeviceTiltsChangeEvent();

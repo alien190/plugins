@@ -60,7 +60,7 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
   final int horizontalTilt;
 
   /// The new vertical tilt of the device
-  final int verticalTilt;
+  final double verticalTilt;
 
   /// Build a new tilts changed event.
   DeviceTiltsChangedEvent({

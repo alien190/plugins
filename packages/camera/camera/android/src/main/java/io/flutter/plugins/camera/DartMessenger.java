@@ -94,7 +94,7 @@ public class DartMessenger {
      * @param verticalTilt specifies the new vertical tilt of the device.
      */
     public void sendDeviceTiltsChangeEvent(int horizontalTilt,
-                                           int verticalTilt,
+                                           double verticalTilt,
                                            PlatformChannel.DeviceOrientation orientation) {
         this.send(
                 DeviceEventType.TILTS_CHANGED,

@@ -12,7 +12,7 @@ class CameraDeviceTilts {
   final int horizontalTilt;
 
   /// Current vertical tilt
-  final int verticalTilt;
+  final double verticalTilt;
 
   /// default constructor for [CameraDeviceTilts]
   CameraDeviceTilts({
