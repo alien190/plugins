@@ -173,9 +173,9 @@ class _CameraTiltsPainter extends CustomPainter {
     int? verticalTiltThreshold,
     int? deviceOrientationGrad,
   }) {
-    _isHorizontalTiltVisible = deviceTilts.horizontalTilt != -1;
+    _isHorizontalTiltVisible = deviceTilts.isHorizontalTiltAvailable;
 
-    _isVerticalTiltVisible = deviceTilts.verticalTilt != 0;
+    _isVerticalTiltVisible = deviceTilts.isVerticalTiltAvailable;
 
     _deviceTilts = deviceTilts;
 
@@ -191,38 +191,60 @@ class _CameraTiltsPainter extends CustomPainter {
 
     _deviceOrientationGrad = deviceOrientationGrad ?? 0;
 
-    _horizontalTilt =
-        (deviceTilts.horizontalTilt + _deviceOrientationGrad) % 360;
+    _horizontalTilt = _isHorizontalTiltVisible
+        ? (deviceTilts.horizontalTilt + _deviceOrientationGrad) % 360
+        : 0;
 
     _horizontalTiltRad = _horizontalTilt * pi / 180;
 
     _horizontalTiltToPrint =
         _horizontalTilt < 90 ? _horizontalTilt : 360 - _horizontalTilt;
 
-    _verticalTilt = deviceTilts.verticalTilt - 90;
+    _verticalTilt = _isVerticalTiltVisible ? deviceTilts.verticalTilt - 90 : 0;
   }
 
   @override
   void paint(Canvas canvas, Size size) {
-    final double lineLength = (size.width / 3) * 0.8;
-    final Offset centreOffset = Offset(size.width / 2, size.height / 2);
-    if (_isVerticalTiltVisible) {
-      _paintVerticalTiltLine(
-        canvas: canvas,
-        centreOffset: centreOffset,
-        lineLength: lineLength,
-      );
-    }
-    if (_isHorizontalTiltVisible) {
-      _paintHorizontalTiltDegree(
-        size: size,
-        canvas: canvas,
-      );
-      _paintHorizontalTiltLine(
-        canvas: canvas,
-        centreOffset: centreOffset,
-        lineLength: lineLength,
-      );
+    if (_isHorizontalTiltVisible || _isVerticalTiltVisible) {
+      final double lineLength = (size.width / 3) * 0.8;
+      final Offset centreOffset = Offset(size.width / 2, size.height / 2);
+
+      final double horizontalTiltDeltaX =
+          0.5 * lineLength * sin(pi / 2 - _horizontalTiltRad);
+      final double horizontalTiltDeltaY =
+          0.5 * lineLength * sin(_horizontalTiltRad);
+
+      if (_isVerticalTiltVisible) {
+        _paintVerticalTiltLine(
+          canvas: canvas,
+          centreOffset: centreOffset,
+          lineLength: lineLength,
+          horizontalTiltDeltaX: horizontalTiltDeltaX,
+          horizontalTiltDeltaY: horizontalTiltDeltaY,
+        );
+        if (!_isHorizontalTiltVisible) {
+          _paintHorizontalTiltLine(
+            canvas: canvas,
+            centreOffset: centreOffset,
+            deltaX: horizontalTiltDeltaX,
+            deltaY: horizontalTiltDeltaY,
+            lineLength: lineLength,
+          );
+        }
+      }
+      if (_isHorizontalTiltVisible) {
+        _paintHorizontalTiltDegree(
+          size: size,
+          canvas: canvas,
+        );
+        _paintHorizontalTiltLine(
+          canvas: canvas,
+          centreOffset: centreOffset,
+          deltaX: horizontalTiltDeltaX,
+          deltaY: horizontalTiltDeltaY,
+          lineLength: lineLength,
+        );
+      }
     }
   }
 
@@ -230,14 +252,19 @@ class _CameraTiltsPainter extends CustomPainter {
     required Canvas canvas,
     required double lineLength,
     required Offset centreOffset,
+    required double deltaX,
+    required double deltaY,
   }) {
-    final double deltaX = 0.5 * lineLength * sin(pi / 2 - _horizontalTiltRad);
-    final double deltaY = 0.5 * lineLength * sin(_horizontalTiltRad);
     final Offset leftPoint =
         Offset(centreOffset.dx + deltaX, centreOffset.dy - deltaY);
     final Offset rightPoint =
         Offset(centreOffset.dx - deltaX, centreOffset.dy + deltaY);
-    canvas.drawLine(leftPoint, rightPoint, _horizontalTiltLinePaint);
+
+    canvas.drawLine(
+      leftPoint,
+      rightPoint,
+      _horizontalTiltLinePaint,
+    );
   }
 
   void _paintHorizontalTiltDegree({
@@ -283,6 +310,8 @@ class _CameraTiltsPainter extends CustomPainter {
     required Canvas canvas,
     required double lineLength,
     required Offset centreOffset,
+    required double horizontalTiltDeltaX,
+    required double horizontalTiltDeltaY,
   }) {
     final double verticalTiltToPlot =
         _verticalTilt >= -_verticalTiltThreshold * 2 &&
@@ -299,9 +328,15 @@ class _CameraTiltsPainter extends CustomPainter {
     final double verticalOffset = verticalTiltToPlot * 2;
 
     final Offset leftPoint = Offset(
-        centreOffset.dx - lineLength / 2, centreOffset.dy + verticalOffset);
+      centreOffset.dx - horizontalTiltDeltaX,
+      centreOffset.dy + verticalOffset + horizontalTiltDeltaY,
+    );
+
     final Offset rightPoint = Offset(
-        centreOffset.dx + lineLength / 2, centreOffset.dy + verticalOffset);
+      centreOffset.dx + horizontalTiltDeltaX,
+      centreOffset.dy + verticalOffset - horizontalTiltDeltaY,
+    );
+
     canvas.drawLine(
       leftPoint,
       rightPoint,
