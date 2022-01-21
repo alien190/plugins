@@ -175,7 +175,7 @@ class _CameraTiltsPainter extends CustomPainter {
   }) {
     _isHorizontalTiltVisible = deviceTilts.horizontalTilt != -1;
 
-    _isVerticalTiltVisible = deviceTilts.verticalTilt == 0;
+    _isVerticalTiltVisible = deviceTilts.verticalTilt != 0;
 
     _deviceTilts = deviceTilts;
 
@@ -199,7 +199,7 @@ class _CameraTiltsPainter extends CustomPainter {
     _horizontalTiltToPrint =
         _horizontalTilt < 90 ? _horizontalTilt : 360 - _horizontalTilt;
 
-    _verticalTilt = 90 + deviceTilts.verticalTilt;
+    _verticalTilt = deviceTilts.verticalTilt - 90;
   }
 
   @override

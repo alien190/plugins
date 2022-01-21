@@ -38,6 +38,7 @@ public class DeviceOrientationManager implements SensorEventListener {
             new IntentFilter(Intent.ACTION_CONFIGURATION_CHANGED);
 
     private static final String TAG = "DeviceOrientationMng";
+    private static final double verticalTiltPrecision = 0.5;
 
     private final Activity activity;
     private final DartMessenger messenger;
@@ -105,7 +106,7 @@ public class DeviceOrientationManager implements SensorEventListener {
                 new OrientationEventListener(activity, SensorManager.SENSOR_DELAY_NORMAL) {
                     @Override
                     public void onOrientationChanged(int angle) {
-                        Log.d(TAG, "Orientation changed event angle:" + angle);
+                        //Log.d(TAG, "Orientation changed event angle:" + angle);
                         PlatformChannel.DeviceOrientation newOrientation = calculateSensorOrientation(angle);
                         if (!newOrientation.equals(lastOrientation) && isOrientationChangeAllowed()) {
                             Log.d(TAG, "sensor orientation set:" + newOrientation.toString());
@@ -444,8 +445,9 @@ public class DeviceOrientationManager implements SensorEventListener {
         if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
             SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
             SensorManager.getOrientation(rotationMatrix, orientationAngles);
-            final double verticalTilt = (orientationAngles[1] * 180 / Math.PI);
-            if (lastVerticalTilt != verticalTilt) {
+            final double verticalTilt = Math.asin(Math.sqrt(Math.pow(event.values[0], 2) + Math.pow(event.values[1], 2))) * 360 / Math.PI;
+            if (lastVerticalTilt - verticalTiltPrecision > verticalTilt
+                    || lastVerticalTilt + verticalTiltPrecision < verticalTilt) {
                 lastVerticalTilt = verticalTilt;
                 sendDeviceTiltsChangeEvent();
             }
@@ -453,7 +455,7 @@ public class DeviceOrientationManager implements SensorEventListener {
     }
 
     private void sendDeviceTiltsChangeEvent() {
-        Log.d(TAG, "Device tilts. Horizontal:" + lastHorizontalTilt + ", vertical:" + lastVerticalTilt);
+        //Log.d(TAG, "Device tilts. Horizontal:" + lastHorizontalTilt + ", vertical:" + lastVerticalTilt);
         messenger.sendDeviceTiltsChangeEvent(lastHorizontalTilt, lastVerticalTilt, lastOrientation);
     }
 
