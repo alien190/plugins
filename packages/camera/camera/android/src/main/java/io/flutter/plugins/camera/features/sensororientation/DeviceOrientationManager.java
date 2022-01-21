@@ -95,7 +95,10 @@ public class DeviceOrientationManager implements SensorEventListener {
     private void startSensorListener() {
         if (orientationEventListener != null) return;
 
-        Sensor rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+        Sensor rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
+        if (rotationSensor == null) {
+            rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+        }
         if (rotationSensor != null) {
             Log.i(TAG, "Rotation sensor has been initialized");
             sensorManager.registerListener(this, rotationSensor,
@@ -449,7 +452,8 @@ public class DeviceOrientationManager implements SensorEventListener {
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
+        if (event.sensor.getType() == Sensor.TYPE_GAME_ROTATION_VECTOR
+                || event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
             SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
             SensorManager.getOrientation(rotationMatrix, orientationAngles);
             final double verticalTilt = Math.asin(Math.sqrt(Math.pow(event.values[0], 2) + Math.pow(event.values[1], 2))) * 360 / Math.PI;
