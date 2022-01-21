@@ -30,7 +30,10 @@ class CameraTilts extends StatelessWidget {
       stream: _cameraController.getDeviceTilts(),
       builder: (_, AsyncSnapshot<CameraDeviceTilts> snapshot) {
         final CameraDeviceTilts? deviceTilts = snapshot.data;
-        if (snapshot.hasData && deviceTilts != null) {
+        if (snapshot.hasData &&
+            deviceTilts != null &&
+            (deviceTilts.isVerticalTiltAvailable ||
+                deviceTilts.isHorizontalTiltAvailable)) {
           return _AnimatedCameraTilts(
             deviceTilts: deviceTilts,
             horizontalTiltThreshold: _horizontalTiltThreshold,
