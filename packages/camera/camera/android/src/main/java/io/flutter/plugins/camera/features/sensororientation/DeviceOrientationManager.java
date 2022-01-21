@@ -51,8 +51,10 @@ public class DeviceOrientationManager implements SensorEventListener {
 
     private final float[] rotationMatrix = new float[9];
     private final float[] orientationAngles = new float[3];
-    private int lastHorizontalTilt = -1;
-    private double lastVerticalTilt = 0;
+    private int lastHorizontalTilt = 0;
+    private double lastVerticalTilt = 90;
+    private boolean isHorizontalTiltAvailable = false;
+    private boolean isVerticalTiltAvailable = false;
 
     /**
      * Factory method to create a device orientation manager.
@@ -98,8 +100,10 @@ public class DeviceOrientationManager implements SensorEventListener {
             Log.i(TAG, "Rotation sensor has been initialized");
             sensorManager.registerListener(this, rotationSensor,
                     SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
+            isVerticalTiltAvailable = true;
         } else {
             Log.w(TAG, "Rotation sensor has NOT been initialized");
+            isVerticalTiltAvailable = false;
         }
 
         orientationEventListener =
@@ -120,7 +124,10 @@ public class DeviceOrientationManager implements SensorEventListener {
                     }
                 };
         if (orientationEventListener.canDetectOrientation()) {
+            isHorizontalTiltAvailable = true;
             orientationEventListener.enable();
+        } else {
+            isHorizontalTiltAvailable = false;
         }
     }
 
@@ -456,7 +463,12 @@ public class DeviceOrientationManager implements SensorEventListener {
 
     private void sendDeviceTiltsChangeEvent() {
         //Log.d(TAG, "Device tilts. Horizontal:" + lastHorizontalTilt + ", vertical:" + lastVerticalTilt);
-        messenger.sendDeviceTiltsChangeEvent(lastHorizontalTilt, lastVerticalTilt, lastOrientation);
+        messenger.sendDeviceTiltsChangeEvent(
+                isHorizontalTiltAvailable,
+                isVerticalTiltAvailable,
+                lastHorizontalTilt,
+                lastVerticalTilt,
+                lastOrientation);
     }
 
     @Override

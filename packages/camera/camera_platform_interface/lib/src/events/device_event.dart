@@ -62,11 +62,19 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
   /// The new vertical tilt of the device
   final double verticalTilt;
 
+  /// Indicates if the horizontal tilt is available on a device
+  final bool isHorizontalTiltAvailable;
+
+  /// Indicates if the vertical tilt is available on a device
+  final bool isVerticalTiltAvailable;
+
   /// Build a new tilts changed event.
   DeviceTiltsChangedEvent({
     required this.horizontalTilt,
     required this.verticalTilt,
     required this.orientation,
+    required this.isHorizontalTiltAvailable,
+    required this.isVerticalTiltAvailable,
   });
 
   /// Converts the supplied [Map] to an instance of the [DeviceTiltsChangedEvent]
@@ -74,7 +82,9 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
   DeviceTiltsChangedEvent.fromJson(Map<dynamic, dynamic> json)
       : verticalTilt = json['verticalTilt'],
         horizontalTilt = json['horizontalTilt'],
-        orientation = deserializeDeviceOrientation(json['orientation']);
+        orientation = deserializeDeviceOrientation(json['orientation']),
+        isHorizontalTiltAvailable = json['isHorizontalTiltAvailable'],
+        isVerticalTiltAvailable = json['isVerticalTiltAvailable'];
 
   /// Converts the [DeviceOrientationChangedEvent] instance into a [Map] instance that
   /// can be serialized to JSON.
@@ -82,6 +92,8 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
         'verticalTilt': verticalTilt,
         'horizontalTilt': horizontalTilt,
         'orientation': serializeDeviceOrientation(orientation),
+        'isHorizontalTiltAvailable': isHorizontalTiltAvailable,
+        'isVerticalTiltAvailable': isVerticalTiltAvailable,
       };
 
   @override
@@ -91,9 +103,15 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
           runtimeType == other.runtimeType &&
           orientation == other.orientation &&
           horizontalTilt == other.horizontalTilt &&
-          verticalTilt == other.verticalTilt;
+          verticalTilt == other.verticalTilt &&
+          isHorizontalTiltAvailable == other.isHorizontalTiltAvailable &&
+          isVerticalTiltAvailable == other.isVerticalTiltAvailable;
 
   @override
   int get hashCode =>
-      orientation.hashCode ^ horizontalTilt.hashCode ^ verticalTilt.hashCode;
+      orientation.hashCode ^
+      horizontalTilt.hashCode ^
+      verticalTilt.hashCode ^
+      isHorizontalTiltAvailable.hashCode ^
+      isVerticalTiltAvailable.hashCode;
 }
