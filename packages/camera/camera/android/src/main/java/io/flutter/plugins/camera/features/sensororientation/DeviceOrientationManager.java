@@ -120,6 +120,7 @@ public class DeviceOrientationManager implements SensorEventListener {
                             lastOrientation = newOrientation;
                             messenger.sendDeviceOrientationChangeEvent(newOrientation);
                         }
+                        isHorizontalTiltAvailable = angle != ORIENTATION_UNKNOWN;
                         if (lastHorizontalTilt != angle) {
                             lastHorizontalTilt = angle;
                             sendDeviceTiltsChangeEvent();
