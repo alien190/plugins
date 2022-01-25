@@ -567,6 +567,21 @@ NSString *const errorMethod = @"error";
         }
     }];
     
+    _motionManager.deviceMotionUpdateInterval = 1.0f;
+    [_motionManager startDeviceMotionUpdatesUsingReferenceFrame:CMAttitudeReferenceFrameXArbitraryZVertical
+                                                        toQueue:NSOperationQueue.mainQueue
+                                                    withHandler:^(CMDeviceMotion * _Nullable motion, NSError * _Nullable error) {
+        NSLog(@"Motion:%@", motion.attitude);
+        double verticalTilt = asin(sqrt(pow(motion.attitude.quaternion.x, 2) + pow(motion.attitude.quaternion.y, 2))) * 360 / M_PI;
+        NSLog(@"VTilt:%f", verticalTilt);
+        double horizontalTilt = asin(motion.attitude.quaternion.y) * 360 / M_PI;
+        NSLog(@"HTilt:%f", horizontalTilt);
+    }];
+//    [_motionManager startGyroUpdatesToQueue:NSOperationQueue.mainQueue
+//                                withHandler:^(CMGyroData * _Nullable gyroData, NSError * _Nullable error) {
+//        NSLog(@"GyroData:%@", gyroData);
+//    }];
+    
     [self updateOrientation];
     
     return self;
