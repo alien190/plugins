@@ -739,10 +739,14 @@ NSString *const errorMethod = @"error";
         for (AVCaptureDeviceFormat* format in captureDevice.formats) {
             CMVideoFormatDescriptionRef formatDescription = format.formatDescription;
             CMVideoDimensions dimentions = CMVideoFormatDescriptionGetDimensions(formatDescription);
+            FourCharCode mediaSubType = CMFormatDescriptionGetMediaSubType(formatDescription);
+
             float aspectRatio = ((float) dimentions.width) / dimentions.height;
             
             if(aspectRatio >= PREFFERED_43FORMAT_LOW_ASPECT_RATIO &&
-               aspectRatio <= PREFFERED_43FORMAT_HIGH_ASPECT_RATIO) {
+               aspectRatio <= PREFFERED_43FORMAT_HIGH_ASPECT_RATIO &&
+               mediaSubType == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
+               ) {
                 NSCameraResolution* resolution = [[NSCameraResolution alloc]
                                                   initWithWidth:dimentions.width
                                                   andHeight:dimentions.height
