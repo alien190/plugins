@@ -13,6 +13,7 @@
 #import "FLTThreadSafeFlutterResult.h"
 #import <Foundation/Foundation.h>
 #import <GLKit/GLKit.h>
+#import "DescriptivePixelFormat.h"
 
 int const DEFAULT_43FORMAT_LONG_SIDE_SIZE = 1600;
 int const DEFAULT_43FORMAT_IMAGE_QUALITY = 100;
@@ -32,6 +33,7 @@ typedef enum {
     max,
     custom43,
 } ResolutionPreset;
+
 
 @interface NSCameraResolution: NSObject
 @property(readonly, nonatomic) int width;
@@ -478,6 +480,7 @@ AVCaptureAudioDataOutputSampleBufferDelegate>
 }
 // Format used for video and image streaming.
 FourCharCode videoFormat = kCVPixelFormatType_32BGRA;
+//FourCharCode videoFormat = kCVPixelFormatType_16Gray;
 NSString *const errorMethod = @"error";
 
 - (instancetype)initWithCameraName:(NSString *)cameraName
@@ -519,6 +522,7 @@ NSString *const errorMethod = @"error";
     _captureVideoOutput = [AVCaptureVideoDataOutput new];
     _captureVideoOutput.videoSettings =
     @{(NSString *)kCVPixelBufferPixelFormatTypeKey : @(videoFormat)};
+    [self printAvailablePixelFormat];
     [_captureVideoOutput setAlwaysDiscardsLateVideoFrames:YES];
     
     AVCaptureConnection *connection =
@@ -570,6 +574,15 @@ NSString *const errorMethod = @"error";
     [self updateOrientation];
     
     return self;
+}
+
+- (void) printAvailablePixelFormat {
+    NSMutableArray *mutablePixelFormatTypes = [NSMutableArray array];
+    [_captureVideoOutput.availableVideoCVPixelFormatTypes enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
+        [mutablePixelFormatTypes addObject:[obj descriptivePixelFormat]];
+    }];
+    NSString *pixelFormats = [mutablePixelFormatTypes componentsJoinedByString:@",\n"];
+    NSLog(@"Available pixel formats:\n%@\n", pixelFormats);
 }
 
 - (void)start {
@@ -738,11 +751,15 @@ NSString *const errorMethod = @"error";
 
         for (AVCaptureDeviceFormat* format in captureDevice.formats) {
             CMVideoFormatDescriptionRef formatDescription = format.formatDescription;
+            NSLog(@"formatDescription:%@", formatDescription);
             CMVideoDimensions dimentions = CMVideoFormatDescriptionGetDimensions(formatDescription);
+            FourCharCode mediaSubType = CMFormatDescriptionGetMediaSubType(formatDescription);
+        
             float aspectRatio = ((float) dimentions.width) / dimentions.height;
             
             if(aspectRatio >= PREFFERED_43FORMAT_LOW_ASPECT_RATIO &&
-               aspectRatio <= PREFFERED_43FORMAT_HIGH_ASPECT_RATIO) {
+               aspectRatio <= PREFFERED_43FORMAT_HIGH_ASPECT_RATIO &&
+               mediaSubType == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) {
                 NSCameraResolution* resolution = [[NSCameraResolution alloc]
                                                   initWithWidth:dimentions.width
                                                   andHeight:dimentions.height
@@ -880,6 +897,10 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
        fromConnection:(AVCaptureConnection *)connection {
     if (output == _captureVideoOutput) {
         CVPixelBufferRef newBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+        const Boolean isPlanar = CVPixelBufferIsPlanar(newBuffer);
+        const size_t planarCount = CVPixelBufferGetPlaneCount(newBuffer);
+        OSType type = CVPixelBufferGetPixelFormatType(newBuffer);
+        //kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
         CFRetain(newBuffer);
         CVPixelBufferRef old = _latestPixelBuffer;
         while (!OSAtomicCompareAndSwapPtrBarrier(old, newBuffer, (void **)&_latestPixelBuffer)) {
@@ -891,6 +912,77 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         if (_onFrameAvailable) {
             _onFrameAvailable();
         }
+        
+
+       
+    
+//        vImage_Error err = kvImageNoError;
+//        vImage_Flags flags = kvImagePrintDiagnosticsToConsole;
+//        vImage_YpCbCrPixelRange pixelRange;
+//        vImage_YpCbCrToARGB outInfo;
+//
+//        pixelRange.Yp_bias = 16;
+//        pixelRange.CbCr_bias = 128;
+//        pixelRange.YpRangeMax = 235;
+//        pixelRange.CbCrRangeMax = 240;
+//        pixelRange.YpMax = 255;
+//        pixelRange.YpMin = 0;
+//        pixelRange.CbCrMax = 255;
+//        pixelRange.CbCrMin = 0;
+//
+//        err = vImageConvert_YpCbCrToARGB_GenerateConversion(kvImage_YpCbCrToARGBMatrix_ITU_R_601_4,
+//                                                            &pixelRange,
+//                                                            &outInfo,
+//                                                            kvImage422YpCbYpCr8,
+//                                                            kvImageARGB8888,
+//                                                            flags);
+//
+//        CVPixelBufferLockBaseAddress(newBuffer, kCVPixelBufferLock_ReadOnly);
+//
+//        void *lumaBaseAdress =  CVPixelBufferGetBaseAddressOfPlane(newBuffer, 0);
+//        size_t lumaBytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(newBuffer, 0);
+//        size_t lumaHeight = CVPixelBufferGetHeightOfPlane(newBuffer, 0);
+//        size_t lumaWidth =  CVPixelBufferGetWidthOfPlane(newBuffer, 0);
+//
+//        vImage_Buffer sourceLumaBuffer = {
+//            .width = lumaWidth,
+//            .height = lumaHeight,
+//            .data = lumaBaseAdress,
+//            .rowBytes = lumaBytesPerRow,
+//        };
+//
+//        void *chromaBaseAdress =  CVPixelBufferGetBaseAddressOfPlane(newBuffer, 1);
+//        size_t chromaBytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(newBuffer, 1);
+//        size_t chromaHeight = CVPixelBufferGetHeightOfPlane(newBuffer, 1);
+//        size_t chromaWidth =  CVPixelBufferGetWidthOfPlane(newBuffer, 1);
+//
+//        vImage_Buffer sourceChromaBuffer = {
+//            .width = chromaWidth,
+//            .height = chromaHeight,
+//            .data = chromaBaseAdress,
+//            .rowBytes = chromaBytesPerRow,
+//        };
+//
+//        vImage_Buffer destinationBuffer;
+//        vImageBuffer_Init(&destinationBuffer,
+//                          sourceLumaBuffer.height,
+//                          sourceLumaBuffer.width,
+//                          32,
+//                          kvImageNoFlags);
+//        uint8_t permuteMap[4] = {3, 2, 1, 0};
+//        vImageConvert_420Yp8_CbCr8ToARGB8888(&sourceLumaBuffer,
+//                                             &sourceChromaBuffer,
+//                                             &destinationBuffer,
+//                                             &outInfo,
+//                                             permuteMap,
+//                                             255,
+//                                             flags);
+//
+//        CVPixelBufferUnlockBaseAddress(newBuffer, kCVPixelBufferLock_ReadOnly);
+//
+//        vImageBuffer_CopyToCVPixelBuffer(const vImage_Buffer *buffer, const vImage_CGImageFormat *bufferFormat, CVPixelBufferRef cvPixelBuffer, vImageCVImageFormatRef cvImageFormat, const CGFloat *backgroundColor, vImage_Flags flags)
+
+        
     }
     if (!CMSampleBufferDataIsReady(sampleBuffer)) {
         [_methodChannel invokeMethod:errorMethod
