@@ -62,12 +62,11 @@ typedef enum {
 @interface FLTSavePhotoDelegate : NSObject <AVCapturePhotoCaptureDelegate>
 @property(readonly, nonatomic) NSString *path;
 @property(readonly, nonatomic) FLTThreadSafeFlutterResult *result;
-@property(readonly, nonatomic) UIDeviceOrientation uiDeviceOrientation;
-@property(readonly, nonatomic) UIDeviceOrientation accelerometerDeviceOrientation;
-@property(readonly, nonatomic) UIDeviceOrientation lockedOrientation;
+@property(assign, nonatomic) double targetImageRotationInRad;
 @property(readonly, nonatomic) ResolutionPreset resolutionPreset;
 @property(assign, nonatomic) int longSideSize;
 @property(assign, nonatomic) int imageQality;
+@property(assign,atomic) NSMutableDictionary* deviceAnglesAndPathDict;
 @end
 
 @interface FLTImageStreamHandler : NSObject <FlutterStreamHandler>
@@ -94,20 +93,19 @@ typedef enum {
 }
 
 - initWithPath:(NSString *)   path result:(FLTThreadSafeFlutterResult *)result
-                      uiDeviceOrientation:(UIDeviceOrientation) uiDeviceOrientation
-           accelerometerDeviceOrientation:(UIDeviceOrientation) accelerometerDeviceOrientation
-                        lockedOrientation:(UIDeviceOrientation) lockedOrientation
+                 targetImageRotationInRad:(double)targetImageRotationInRad
                          resolutionPreset:(ResolutionPreset)resolutionPreset
                              longSideSize:(int)longSideSize
-                             imageQuality:(int)imageQuality{
+                             imageQuality:(int)imageQuality
+                         deviceAnglesDict:(NSMutableDictionary*)deviceAnglesDict{
     self = [super init];
     NSAssert(self, @"super init cannot be nil");
     _path = path;
+    _deviceAnglesAndPathDict = deviceAnglesDict;
+    _deviceAnglesAndPathDict[@"resultPath"] = _path;
     selfReference = self;
     _result = result;
-    _uiDeviceOrientation = uiDeviceOrientation;
-    _accelerometerDeviceOrientation = accelerometerDeviceOrientation;
-    _lockedOrientation = lockedOrientation;
+    _targetImageRotationInRad = targetImageRotationInRad;
     _resolutionPreset = resolutionPreset;
     _longSideSize = longSideSize;
     _imageQality = imageQuality;
@@ -138,7 +136,8 @@ previewPhotoSampleBuffer:(CMSampleBufferRef)previewPhotoSampleBuffer
           [_result sendErrorWithCode:@"IOError" message:@"Unable to write file" details:nil];
           return;
         }
-        [_result sendSuccessWithData:_path];
+        
+        [_result sendSuccessWithData:_deviceAnglesAndPathDict];
     }
 }
 
@@ -161,22 +160,14 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
           [_result sendErrorWithCode:@"IOError" message:@"Unable to write file" details:nil];
           return;
         }
-        [_result sendSuccessWithData:_path];
+        [_result sendSuccessWithData:_deviceAnglesAndPathDict];
     }
 }
 
 -(void) processPhotoData: (NSData*) photoData {
-    CGFloat rotation = (_lockedOrientation == UIDeviceOrientationUnknown && _accelerometerDeviceOrientation == _uiDeviceOrientation)? 0 :
-                       (_accelerometerDeviceOrientation != _uiDeviceOrientation
-                                       // when UI orientation is fixed in the device settings
-                                       ? [self getRotationAngleInRadiansForOrintation:_accelerometerDeviceOrientation] -
-                                         [self getRotationAngleInRadiansForOrintation:_uiDeviceOrientation]
-                                      // when UI orientation changing is allowed in the device settings
-                                       : [self getRotationAngleInRadiansForOrintation:_uiDeviceOrientation] -
-                                         [self getRotationAngleInRadiansForOrintation:_lockedOrientation]);
     UIImage* image = [[UIImage alloc] initWithData:photoData];
     // Calculate Destination Size
-    CGAffineTransform rotationTransform = CGAffineTransformMakeRotation(rotation);
+    CGAffineTransform rotationTransform = CGAffineTransformMakeRotation(_targetImageRotationInRad);
     double ratio = 1;
     if(image.size.width > image.size.height) {
         ratio = ((double)_longSideSize) / image.size.width;
@@ -196,7 +187,7 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
     UIGraphicsBeginImageContext(destinationSize);
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextTranslateCTM(context, destinationSize.width / 2.0f, destinationSize.height / 2.0f);
-    CGContextRotateCTM(context, rotation);
+    CGContextRotateCTM(context, _targetImageRotationInRad);
     CGContextScaleCTM(context, ratio, ratio);
     [image drawInRect:CGRectMake(-image.size.width / 2.0f, -image.size.height / 2.0f, image.size.width, image.size.height)];
     
@@ -212,22 +203,6 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
         return;
     }
     [_result sendSuccessWithData:_path];
-}
-
--(CGFloat) getRotationAngleInRadiansForOrintation:(UIDeviceOrientation)orintation {
-    switch (orintation) {
-        case UIDeviceOrientationLandscapeLeft:
-            return GLKMathDegreesToRadians(-90);
-        case UIDeviceOrientationLandscapeRight:
-            return GLKMathDegreesToRadians(90);
-        case UIDeviceOrientationPortraitUpsideDown:
-            return  GLKMathDegreesToRadians(180);
-        case UIDeviceOrientationPortrait:
-        case UIDeviceOrientationFaceUp:
-        case UIDeviceOrientationFaceDown:
-        case UIDeviceOrientationUnknown:
-            return  0;
-    }
 }
 
 @end
@@ -469,12 +444,20 @@ AVCaptureAudioDataOutputSampleBufferDelegate>
 @property AVAssetWriterInputPixelBufferAdaptor *videoAdaptor;
 @property(assign, nonatomic) int longSideSize;
 @property(assign, nonatomic) int imageQality;
+@property(assign, atomic) BOOL isVerticalTiltAvailable;
+@property(assign, atomic) BOOL isHorizontalTiltAvailable;
+@property(assign, atomic) double horizontalTilt;
+@property(assign, atomic) double verticalTilt;
+@property(assign, atomic) double horizontalTiltToPublish;
+@property(assign, atomic) double verticalTiltToPublish;
+@property(readonly, nonatomic) FlutterMethodChannel *deviceEventMethodChannel;
 @end
 
 @implementation FLTCam {
     dispatch_queue_t _dispatchQueue;
-    UIDeviceOrientation _uiDeviceOrientation;
     UIDeviceOrientation _accelerometerDeviceOrientation;
+    UIDeviceOrientation _uiDeviceOrientation;
+    CGFloat _targetImageRotation;
 }
 // Format used for video and image streaming.
 FourCharCode videoFormat = kCVPixelFormatType_32BGRA;
@@ -487,7 +470,8 @@ NSString *const errorMethod = @"error";
                        enableAudio:(BOOL)enableAudio
                        orientation:(UIDeviceOrientation)orientation
                      dispatchQueue:(dispatch_queue_t)dispatchQueue
-                             error:(NSError **)error {
+                             error:(NSError **)error
+          deviceEventMethodChannel:(FlutterMethodChannel *)deviceEventMethodChannel{
     self = [super init];
     NSAssert(self, @"super init cannot be nil");
     @try {
@@ -506,6 +490,7 @@ NSString *const errorMethod = @"error";
     _uiDeviceOrientation = orientation;
     _longSideSize = longSideSize > 0 ? longSideSize : DEFAULT_43FORMAT_LONG_SIDE_SIZE;
     _imageQality = imageQuality > 0 ? imageQuality : DEFAULT_43FORMAT_IMAGE_QUALITY;
+    _deviceEventMethodChannel = deviceEventMethodChannel;
     
     NSError *localError = nil;
     _captureVideoInput = [AVCaptureDeviceInput deviceInputWithDevice:_captureDevice
@@ -545,46 +530,151 @@ NSString *const errorMethod = @"error";
     
     [_captureVideoOutput setSampleBufferDelegate:self queue:dispatch_get_main_queue()];
     
-    _motionManager = [[CMMotionManager alloc] init];
-    _motionManager.accelerometerUpdateInterval = 0.5f;
-    [_motionManager startAccelerometerUpdatesToQueue:NSOperationQueue.mainQueue
-                                         withHandler:^(CMAccelerometerData *accelerometerData, NSError* error) {
-        if(accelerometerData!=nil && error == nil) {
-            CMAcceleration acceleration = accelerometerData.acceleration;
-            if(fabs(acceleration.y) < fabs(acceleration.x)) {
-                if(acceleration.x > 0 ) {
-                    [self setAccelerometerDeviceOrientation: UIDeviceOrientationLandscapeRight];
-                } else {
-                    [self setAccelerometerDeviceOrientation: UIDeviceOrientationLandscapeLeft];
-                }
-            } else {
-                if(acceleration.y > 0 ) {
-                    [self setAccelerometerDeviceOrientation: UIDeviceOrientationPortraitUpsideDown];
-                } else {
-                    [self setAccelerometerDeviceOrientation: UIDeviceOrientationPortrait];
-                }
-            }
-        }
-    }];
-    
-    _motionManager.deviceMotionUpdateInterval = 1.0f;
-    [_motionManager startDeviceMotionUpdatesUsingReferenceFrame:CMAttitudeReferenceFrameXArbitraryZVertical
-                                                        toQueue:NSOperationQueue.mainQueue
-                                                    withHandler:^(CMDeviceMotion * _Nullable motion, NSError * _Nullable error) {
-        NSLog(@"Motion:%@", motion.attitude);
-        double verticalTilt = asin(sqrt(pow(motion.attitude.quaternion.x, 2) + pow(motion.attitude.quaternion.y, 2))) * 360 / M_PI;
-        NSLog(@"VTilt:%f", verticalTilt);
-        double horizontalTilt = asin(motion.attitude.quaternion.y) * 360 / M_PI;
-        NSLog(@"HTilt:%f", horizontalTilt);
-    }];
-//    [_motionManager startGyroUpdatesToQueue:NSOperationQueue.mainQueue
-//                                withHandler:^(CMGyroData * _Nullable gyroData, NSError * _Nullable error) {
-//        NSLog(@"GyroData:%@", gyroData);
-//    }];
-    
+    [self initSensors];
     [self updateOrientation];
     
     return self;
+}
+
+- (void) initSensors {
+    _motionManager = [[CMMotionManager alloc] init];
+    _isVerticalTiltAvailable = false;
+    _isHorizontalTiltAvailable = false;
+    _horizontalTilt = 0;
+    _verticalTilt = 0;
+        
+    if ([_motionManager isAccelerometerAvailable]) {
+        _isHorizontalTiltAvailable = true;
+        
+        _motionManager.accelerometerUpdateInterval = 0.25f;
+        [_motionManager startAccelerometerUpdatesToQueue:NSOperationQueue.mainQueue
+                                             withHandler:^(CMAccelerometerData *accelerometerData, NSError* error) {
+            if(accelerometerData!=nil && error == nil) {
+                [self calculateAccelerometerAngles:accelerometerData.acceleration];
+                if(!self->_isVerticalTiltAvailable) {
+                    [self sendAnglesUpdate];
+                }
+            }
+        }];
+    }
+    
+    if([_motionManager isDeviceMotionAvailable]) {
+        _isVerticalTiltAvailable = true;
+        
+        _motionManager.deviceMotionUpdateInterval = 0.25f;
+        [_motionManager startDeviceMotionUpdatesUsingReferenceFrame:CMAttitudeReferenceFrameXArbitraryZVertical
+                                                            toQueue:NSOperationQueue.mainQueue
+                                                        withHandler:^(CMDeviceMotion * _Nullable motion, NSError * _Nullable error) {
+            double verticalTilt = asin(sqrt(pow(motion.attitude.quaternion.x, 2) + pow(motion.attitude.quaternion.y, 2))) * 360 / M_PI - 90;
+            self->_verticalTilt = verticalTilt;
+            NSLog(@"VerticalTilt:%f", verticalTilt);
+            if(verticalTilt<=45 && verticalTilt >=-45) {
+                self->_verticalTiltToPublish = verticalTilt;
+            } else {
+                double overheadVerticalTilt = 0;
+                double overheadHorizontalTilt = 0;
+                switch((int)self->_targetImageRotation) {
+                    case 0:
+                        overheadVerticalTilt = motion.attitude.pitch * 180 / M_PI;
+                        overheadHorizontalTilt = -motion.attitude.roll * 180 / M_PI;
+                        break;
+                    case 90:
+                        overheadVerticalTilt = motion.attitude.roll * 180 / M_PI;
+                        overheadHorizontalTilt = motion.attitude.pitch * 180 / M_PI;
+                        break;
+                    case 180:
+                        overheadVerticalTilt = -motion.attitude.pitch * 180 / M_PI;
+                        overheadHorizontalTilt = motion.attitude.roll * 180 / M_PI;
+                        break;
+                    case 270:
+                        overheadVerticalTilt = -motion.attitude.roll * 180 / M_PI;
+                        overheadHorizontalTilt = -motion.attitude.pitch * 180 / M_PI;
+                        break;
+                    default:
+                        break;
+                }
+                //NSLog(@"overheadVerticalTilt:%f", overheadVerticalTilt);
+                //NSLog(@"overheadHorizontalTilt:%f", overheadHorizontalTilt);
+                self->_verticalTiltToPublish = overheadVerticalTilt;
+                self->_horizontalTiltToPublish = overheadHorizontalTilt;
+            }
+            [self sendAnglesUpdate];
+        }];
+    }
+}
+
+-(void) calculateAccelerometerAngles:(CMAcceleration)acceleration {
+    double accelerometerAngle = fmod(atan2(-acceleration.x, acceleration.y) * 180 / M_PI + 180, 360);
+    //NSLog(@"accelerometerAngle=%f", accelerometerAngle);
+    
+    if(!_isVerticalTiltAvailable || (_verticalTilt <= 45 && _verticalTilt >= -45)) {
+        if(fabs(acceleration.y) < fabs(acceleration.x)) {
+            if(acceleration.x > 0 ) {
+                [self setAccelerometerDeviceOrientation: UIDeviceOrientationLandscapeRight];
+            } else {
+                [self setAccelerometerDeviceOrientation: UIDeviceOrientationLandscapeLeft];
+            }
+        } else {
+            if(acceleration.y > 0 ) {
+                [self setAccelerometerDeviceOrientation: UIDeviceOrientationPortraitUpsideDown];
+            } else {
+                [self setAccelerometerDeviceOrientation: UIDeviceOrientationPortrait];
+            }
+        }
+    
+        self->_targetImageRotation =
+        (self->_lockedCaptureOrientation == UIDeviceOrientationUnknown && self->_accelerometerDeviceOrientation == self->_uiDeviceOrientation)? 0 :
+        (self->_accelerometerDeviceOrientation != self->_uiDeviceOrientation
+                            // when UI orientation is fixed in the device settings
+                            ? [self getRotationAngleForOrintation:self->_accelerometerDeviceOrientation] -
+                            [self getRotationAngleForOrintation:self->_uiDeviceOrientation]
+                            // when UI orientation changing is allowed in the device settings
+                            : [self getRotationAngleForOrintation:self->_uiDeviceOrientation] -
+                            [self getRotationAngleForOrintation:self->_lockedCaptureOrientation]);
+        //NSLog(@"targetImageRotation=%f", self->_targetImageRotation);
+    }
+    
+    if(!_isVerticalTiltAvailable || (_verticalTilt <= 45 && _verticalTilt >= -45)) {
+        double horizontalTilt = self->_targetImageRotation - accelerometerAngle;
+        self->_horizontalTilt = fabs(horizontalTilt) > 90 ? horizontalTilt + 360 : horizontalTilt;
+        self->_horizontalTiltToPublish = self->_horizontalTilt;
+        //NSLog(@"horizontalTilt=%f", self->_horizontalTilt);
+    }
+}
+
+-(CGFloat) getRotationAngleForOrintation:(UIDeviceOrientation)orintation {
+    switch (orintation) {
+        case UIDeviceOrientationLandscapeLeft:
+            return 270;
+        case UIDeviceOrientationLandscapeRight:
+            return 90;
+        case UIDeviceOrientationPortraitUpsideDown:
+            return 180;
+        case UIDeviceOrientationPortrait:
+        case UIDeviceOrientationFaceUp:
+        case UIDeviceOrientationFaceDown:
+        case UIDeviceOrientationUnknown:
+            return  0;
+    }
+}
+
+- (void)sendAnglesUpdate {
+    NSMutableDictionary* anglesDict = [self getAnglesDictionary];
+    [_deviceEventMethodChannel invokeMethod:@"tilts_changed"
+                                  arguments:anglesDict];
+}
+
+-(NSMutableDictionary*) getAnglesDictionary {
+    NSMutableDictionary* dict = [NSMutableDictionary dictionary];
+    dict[@"isVerticalTiltAvailable"] = @(_isVerticalTiltAvailable);
+    dict[@"isHorizontalTiltAvailable"] = @(_isHorizontalTiltAvailable);
+    dict[@"horizontalTilt"] = @(_horizontalTiltToPublish);
+    dict[@"verticalTilt"] = @(_verticalTiltToPublish);
+    dict[@"mode"] = _isVerticalTiltAvailable
+                    ? (_verticalTilt <= 45 && _verticalTilt >= -45 ? @"normalShot" : @"overheadShot" )
+                    : @"unknownShot";
+    dict[@"targetImageRotation"] = @(_targetImageRotation);
+    return  dict;
 }
 
 - (void)start {
@@ -600,7 +690,6 @@ NSString *const errorMethod = @"error";
         return;
     }
     _accelerometerDeviceOrientation = orientation;
-
 }
 
 - (void)setUiDeviceOrientation:(UIDeviceOrientation)orientation {
@@ -688,12 +777,11 @@ NSString *const errorMethod = @"error";
     [_capturePhotoOutput capturePhotoWithSettings:settings
                                          delegate:[[FLTSavePhotoDelegate alloc] initWithPath:path
                                                                                       result:result
-                                                                         uiDeviceOrientation:_uiDeviceOrientation
-                                                              accelerometerDeviceOrientation:_accelerometerDeviceOrientation
-                                                                           lockedOrientation:_lockedCaptureOrientation
+                                                                    targetImageRotationInRad:_targetImageRotation * M_PI / 180
                                                                             resolutionPreset:_resolutionPreset
                                                                                 longSideSize:_longSideSize
-                                                                                imageQuality:_imageQality]];
+                                                                                imageQuality:_imageQality
+                                                                            deviceAnglesDict:[self getAnglesDictionary]]];
 }
 
 - (AVCaptureVideoOrientation)getVideoOrientationForDeviceOrientation:
@@ -1755,7 +1843,8 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
                                                  enableAudio:[enableAudio boolValue]
                                                  orientation:[[UIDevice currentDevice] orientation]
                                                dispatchQueue:self->_dispatchQueue
-                                                       error:&error];
+                                                       error:&error
+                                    deviceEventMethodChannel:self->_deviceEventMethodChannel];
             if (error) {
                 [result sendError:error];
             } else {
