@@ -2,19 +2,12 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../camera.dart';
+import 'camera_device_tilts.dart';
 
 /// Rotates the child widget according to locked and device's orientation
 class CameraRotator extends StatelessWidget {
-  static const Map<DeviceOrientation, int> _turns = {
-    DeviceOrientation.portraitUp: 0,
-    DeviceOrientation.landscapeRight: 3,
-    DeviceOrientation.portraitDown: 2,
-    DeviceOrientation.landscapeLeft: 1,
-  };
-
   final Widget _child;
   final CameraController _controller;
 
@@ -29,48 +22,28 @@ class CameraRotator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<CameraValue>(
-      valueListenable: _controller,
-      builder: (context, value, child) =>
-          _wrapInRotatedBox(child: child, value: value),
-      child: _child,
-    );
+    return StreamBuilder<CameraDeviceTilts>(
+        stream: _controller.getDeviceTilts(),
+        builder: (context, AsyncSnapshot<CameraDeviceTilts> snapshot) {
+          if (snapshot.hasData && snapshot.data != null) {
+            return _wrapInRotatedBox(
+              child: _child,
+              deviceTilts: snapshot.data!,
+            );
+          }
+          return _child;
+        });
   }
 
   Widget _wrapInRotatedBox({
     required Widget? child,
-    required CameraValue value,
+    required CameraDeviceTilts deviceTilts,
   }) {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
-      return child ?? Container();
-    }
-
     return AnimatedContainer(
       duration: Duration(milliseconds: 300),
-      transform: Matrix4.rotationZ(pi / 2 * _getQuarterTurns(value: value)),
+      transform: Matrix4.rotationZ(pi / 2 * deviceTilts.targetImageRotation),
       transformAlignment: Alignment.center,
       child: child,
     );
-  }
-
-  // Widget _wrapInRotatedBox({
-  //   required Widget? child,
-  //   required CameraValue value,
-  // }) {
-  //   if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
-  //     return child ?? Container();
-  //   }
-  //
-  //   return RotatedBox(
-  //     quarterTurns: _getQuarterTurns(value: value),
-  //     child: child,
-  //   );
-  // }
-
-  int _getQuarterTurns({required CameraValue value}) {
-    return value.lockedCaptureOrientation == null
-        ? 0
-        : _turns[value.deviceOrientation]! -
-            (_turns[value.lockedCaptureOrientation] ?? 0);
   }
 }
