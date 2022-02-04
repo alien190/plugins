@@ -111,8 +111,7 @@ abstract class CameraPlatform extends PlatformInterface {
 
   /// The device tilts changed.
   Stream<DeviceTiltsChangedEvent> onDeviceTiltsChanged() {
-    throw UnimplementedError(
-        'onDeviceTiltsChanged() is not implemented.');
+    throw UnimplementedError('onDeviceTiltsChanged() is not implemented.');
   }
 
   /// Locks the capture orientation.
@@ -127,7 +126,7 @@ abstract class CameraPlatform extends PlatformInterface {
   }
 
   /// Captures an image and returns the file where it was saved.
-  Future<XFile> takePicture(int cameraId) {
+  Future<TakePictureResult> takePicture(int cameraId) {
     throw UnimplementedError('takePicture() is not implemented.');
   }
 

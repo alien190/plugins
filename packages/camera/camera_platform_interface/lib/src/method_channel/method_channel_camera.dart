@@ -207,20 +207,21 @@ class MethodChannelCamera extends CameraPlatform {
   }
 
   @override
-  Future<XFile> takePicture(int cameraId) async {
-    final path = await _channel.invokeMethod<String>(
+  Future<TakePictureResult> takePicture(int cameraId) async {
+    final Map<dynamic, dynamic>? resultMap =
+        await _channel.invokeMethod<Map<dynamic, dynamic>>(
       'takePicture',
       <String, dynamic>{'cameraId': cameraId},
     );
 
-    if (path == null) {
+    if (resultMap == null) {
       throw CameraException(
-        'INVALID_PATH',
-        'The platform "$defaultTargetPlatform" did not return a path while reporting success. The platform should always return a valid path or report an error.',
+        'INVALID_RESULT',
+        'The platform "$defaultTargetPlatform" did not return a result while reporting success. The platform should always return a valid path or report an error.',
       );
     }
 
-    return XFile(path);
+    return TakePictureResult.fromJson(resultMap);
   }
 
   @override

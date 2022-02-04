@@ -5,6 +5,8 @@
 import 'package:camera_platform_interface/src/utils/utils.dart';
 import 'package:flutter/services.dart';
 
+import '../../camera_platform_interface.dart';
+
 /// Generic Event coming from the native side of Camera,
 /// not related to a specific camera module.
 ///
@@ -53,11 +55,8 @@ class DeviceOrientationChangedEvent extends DeviceEvent {
 /// The [DeviceTiltsChangedEvent] is fired every time the user changes the
 /// horizontal or vertical tilts of the device.
 class DeviceTiltsChangedEvent extends DeviceEvent {
-  /// The new orientation of the device
-  final DeviceOrientation orientation;
-
   /// The new horizontal tilt of the device
-  final int horizontalTilt;
+  final double horizontalTilt;
 
   /// The new vertical tilt of the device
   final double verticalTilt;
@@ -68,13 +67,20 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
   /// Indicates if the vertical tilt is available on a device
   final bool isVerticalTiltAvailable;
 
+  /// The mode of the picture taking
+  final TakePictureMode mode;
+
+  /// The rotation angle of the image
+  final double targetImageRotation;
+
   /// Build a new tilts changed event.
   DeviceTiltsChangedEvent({
     required this.horizontalTilt,
     required this.verticalTilt,
-    required this.orientation,
     required this.isHorizontalTiltAvailable,
     required this.isVerticalTiltAvailable,
+    required this.mode,
+    required this.targetImageRotation,
   });
 
   /// Converts the supplied [Map] to an instance of the [DeviceTiltsChangedEvent]
@@ -82,18 +88,20 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
   DeviceTiltsChangedEvent.fromJson(Map<dynamic, dynamic> json)
       : verticalTilt = json['verticalTilt'],
         horizontalTilt = json['horizontalTilt'],
-        orientation = deserializeDeviceOrientation(json['orientation']),
         isHorizontalTiltAvailable = json['isHorizontalTiltAvailable'],
-        isVerticalTiltAvailable = json['isVerticalTiltAvailable'];
+        isVerticalTiltAvailable = json['isVerticalTiltAvailable'],
+        targetImageRotation = json['targetImageRotation'],
+        mode = (json['mode'] as String).toTakePictureMode;
 
   /// Converts the [DeviceOrientationChangedEvent] instance into a [Map] instance that
   /// can be serialized to JSON.
   Map<String, dynamic> toJson() => {
         'verticalTilt': verticalTilt,
         'horizontalTilt': horizontalTilt,
-        'orientation': serializeDeviceOrientation(orientation),
         'isHorizontalTiltAvailable': isHorizontalTiltAvailable,
         'isVerticalTiltAvailable': isVerticalTiltAvailable,
+        'targetImageRotation': targetImageRotation,
+        'mode': mode.toStringValue,
       };
 
   @override
@@ -101,17 +109,19 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
       identical(this, other) ||
       other is DeviceTiltsChangedEvent &&
           runtimeType == other.runtimeType &&
-          orientation == other.orientation &&
           horizontalTilt == other.horizontalTilt &&
           verticalTilt == other.verticalTilt &&
           isHorizontalTiltAvailable == other.isHorizontalTiltAvailable &&
-          isVerticalTiltAvailable == other.isVerticalTiltAvailable;
+          isVerticalTiltAvailable == other.isVerticalTiltAvailable &&
+          mode == other.mode &&
+          targetImageRotation == other.targetImageRotation;
 
   @override
   int get hashCode =>
-      orientation.hashCode ^
       horizontalTilt.hashCode ^
       verticalTilt.hashCode ^
       isHorizontalTiltAvailable.hashCode ^
-      isVerticalTiltAvailable.hashCode;
+      isVerticalTiltAvailable.hashCode ^
+      mode.hashCode ^
+      targetImageRotation.hashCode;
 }
