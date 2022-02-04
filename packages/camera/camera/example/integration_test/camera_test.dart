@@ -59,10 +59,10 @@ void main() {
         'Capturing photo at $preset (${expectedSize.width}x${expectedSize.height}) using camera ${controller.description.name}');
 
     // Take Picture
-    final file = await controller.takePicture();
+    final result = await controller.takePicture();
 
     // Load picture
-    final File fileImage = File(file.path);
+    final File fileImage = File(result.file.path);
     final Image image = await decodeImageFromList(fileImage.readAsBytesSync());
 
     // Verify image dimensions are as expected

@@ -72,7 +72,7 @@ class _AnimatedCameraTiltsState extends State<_AnimatedCameraTilts>
   int? _horizontalTiltThreshold;
   int? _verticalTiltThreshold;
   late final AnimationController _controller;
-  late Animation<int> _orientationAnimation;
+  late Animation<double> _orientationAnimation;
 
   _AnimatedCameraTiltsState({
     required CameraDeviceTilts deviceTilts,
@@ -91,9 +91,9 @@ class _AnimatedCameraTiltsState extends State<_AnimatedCameraTilts>
       duration: Duration(milliseconds: 300),
     );
 
-    _orientationAnimation = IntTween(
+    _orientationAnimation = Tween<double>(
       begin: 0,
-      end: _deviceTilts.deviceOrientation.grad,
+      end: _deviceTilts.targetImageRotation,
     ).animate(_controller);
 
     _controller.forward();
@@ -105,14 +105,14 @@ class _AnimatedCameraTiltsState extends State<_AnimatedCameraTilts>
     if (widget.deviceTilts != _deviceTilts ||
         widget.verticalTiltThreshold != _verticalTiltThreshold ||
         widget.verticalTiltThreshold != _verticalTiltThreshold) {
-      if (widget.deviceTilts.deviceOrientation.grad !=
+      if (widget.deviceTilts.targetImageRotation !=
           _orientationAnimation.value) {
         if (_controller.isAnimating) {
           _controller.stop();
         }
-        _orientationAnimation = IntTween(
+        _orientationAnimation = Tween<double>(
           begin: _orientationAnimation.value,
-          end: widget.deviceTilts.deviceOrientation.grad,
+          end: widget.deviceTilts.targetImageRotation,
         ).animate(_controller);
         _controller.forward(from: 0);
       }
@@ -159,14 +159,14 @@ class _CameraTiltsPainter extends CustomPainter {
     ..strokeWidth = 2
     ..style = PaintingStyle.stroke;
 
-  late final int _horizontalTilt;
+  late final double _horizontalTilt;
   late final double _verticalTilt;
   late final double _horizontalTiltRad;
   late final int _horizontalTiltToPrint;
   late final CameraDeviceTilts _deviceTilts;
   late final int _horizontalTiltThreshold;
   late final int _verticalTiltThreshold;
-  late final int _deviceOrientationGrad;
+  late final double _deviceOrientationGrad;
   late final bool _isHorizontalTiltVisible;
   late final bool _isVerticalTiltVisible;
 
@@ -174,7 +174,7 @@ class _CameraTiltsPainter extends CustomPainter {
     required CameraDeviceTilts deviceTilts,
     int? horizontalTiltThreshold,
     int? verticalTiltThreshold,
-    int? deviceOrientationGrad,
+    double? deviceOrientationGrad,
   }) {
     _isHorizontalTiltVisible = deviceTilts.isHorizontalTiltAvailable;
 
@@ -201,7 +201,8 @@ class _CameraTiltsPainter extends CustomPainter {
     _horizontalTiltRad = _horizontalTilt * pi / 180;
 
     _horizontalTiltToPrint =
-        _horizontalTilt < 90 ? _horizontalTilt : 360 - _horizontalTilt;
+        (_horizontalTilt < 90 ? _horizontalTilt : 360 - _horizontalTilt)
+            .toInt();
 
     _verticalTilt = _isVerticalTiltVisible ? deviceTilts.verticalTilt - 90 : 0;
   }

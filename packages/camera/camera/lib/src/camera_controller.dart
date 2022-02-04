@@ -408,7 +408,7 @@ class CameraController extends ValueNotifier<CameraValue> {
   /// Captures an image and returns the file where it was saved.
   ///
   /// Throws a [CameraException] if the capture fails.
-  Future<XFile> takePicture() async {
+  Future<TakePictureResult> takePicture() async {
     _throwIfNotInitialized("takePicture");
     if (value.isTakingPicture) {
       throw CameraException(
@@ -420,11 +420,12 @@ class CameraController extends ValueNotifier<CameraValue> {
       value = value.copyWith(
         isTakingPicture: true,
       );
-      XFile file = await CameraPlatform.instance.takePicture(_cameraId);
+      TakePictureResult result =
+          await CameraPlatform.instance.takePicture(_cameraId);
       value = value.copyWith(
         isTakingPicture: false,
       );
-      return file;
+      return result;
     } on PlatformException catch (e) {
       value = value.copyWith(
         isTakingPicture: false,
@@ -882,10 +883,9 @@ class CameraController extends ValueNotifier<CameraValue> {
     return CameraPlatform.instance
         .onDeviceTiltsChanged()
         .map((DeviceTiltsChangedEvent event) => CameraDeviceTilts(
-              deviceOrientation: event.orientation,
+              targetImageRotation: event.targetImageRotation,
               verticalTilt: event.verticalTilt,
               horizontalTilt: event.horizontalTilt,
-              lockedCaptureOrientation: value.lockedCaptureOrientation,
               isHorizontalTiltAvailable: event.isHorizontalTiltAvailable,
               isVerticalTiltAvailable: event.isVerticalTiltAvailable,
             ));

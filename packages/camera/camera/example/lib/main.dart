@@ -1054,8 +1054,9 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     }
 
     try {
-      XFile file = await cameraController.takePicture();
-      return file;
+      final TakePictureResult result = await cameraController.takePicture();
+      print('Take picture result: $result');
+      return result.file;
     } on CameraException catch (e) {
       _showCameraException(e);
       return null;
