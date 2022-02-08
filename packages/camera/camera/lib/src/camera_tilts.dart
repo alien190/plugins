@@ -3,7 +3,6 @@ import 'dart:ui';
 
 import 'package:camera/src/camera_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'camera_device_tilts.dart';
 
@@ -27,7 +26,7 @@ class CameraTilts extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder(
-      stream: _cameraController.getDeviceTilts(),
+      stream: _cameraController.deviceTilts,
       builder: (_, AsyncSnapshot<CameraDeviceTilts> snapshot) {
         final CameraDeviceTilts? deviceTilts = snapshot.data;
         if (snapshot.hasData &&
@@ -72,7 +71,8 @@ class _AnimatedCameraTiltsState extends State<_AnimatedCameraTilts>
   int? _horizontalTiltThreshold;
   int? _verticalTiltThreshold;
   late final AnimationController _controller;
-  late Animation<double> _orientationAnimation;
+  late Animation<double> _rotationAnimation;
+  late double _lastTargetImageRotation;
 
   _AnimatedCameraTiltsState({
     required CameraDeviceTilts deviceTilts,
@@ -91,10 +91,12 @@ class _AnimatedCameraTiltsState extends State<_AnimatedCameraTilts>
       duration: Duration(milliseconds: 300),
     );
 
-    _orientationAnimation = Tween<double>(
-      begin: 0,
+    _rotationAnimation = Tween<double>(
+      begin: _deviceTilts.targetImageRotation,
       end: _deviceTilts.targetImageRotation,
     ).animate(_controller);
+
+    _lastTargetImageRotation = _deviceTilts.targetImageRotation;
 
     _controller.forward();
   }
@@ -102,20 +104,13 @@ class _AnimatedCameraTiltsState extends State<_AnimatedCameraTilts>
   @override
   void didUpdateWidget(covariant _AnimatedCameraTilts oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    if (widget.deviceTilts.targetImageRotation != _lastTargetImageRotation) {
+      _updateAnimation(widget.deviceTilts.targetImageRotation);
+    }
     if (widget.deviceTilts != _deviceTilts ||
         widget.verticalTiltThreshold != _verticalTiltThreshold ||
         widget.verticalTiltThreshold != _verticalTiltThreshold) {
-      if (widget.deviceTilts.targetImageRotation !=
-          _orientationAnimation.value) {
-        if (_controller.isAnimating) {
-          _controller.stop();
-        }
-        _orientationAnimation = Tween<double>(
-          begin: _orientationAnimation.value,
-          end: widget.deviceTilts.targetImageRotation,
-        ).animate(_controller);
-        _controller.forward(from: 0);
-      }
       _verticalTiltThreshold = widget.verticalTiltThreshold;
       _horizontalTiltThreshold = widget.horizontalTiltThreshold;
       _deviceTilts = widget.deviceTilts;
@@ -123,17 +118,51 @@ class _AnimatedCameraTiltsState extends State<_AnimatedCameraTilts>
     }
   }
 
+  void _updateAnimation(double targetImageRotation) {
+    if (_controller.isAnimating) {
+      _controller.stop();
+    }
+    if (_lastTargetImageRotation == 270 && targetImageRotation == 0) {
+      _rotationAnimation = Tween<double>(
+        begin: _rotationAnimation.value >= 0
+            ? _rotationAnimation.value - 360
+            : _rotationAnimation.value,
+        end: targetImageRotation,
+      ).animate(_controller);
+    } else if (_lastTargetImageRotation == 0 && targetImageRotation == 270) {
+      _rotationAnimation = Tween<double>(
+        begin: _rotationAnimation.value,
+        end: -90,
+      ).animate(_controller);
+    } else if (_lastTargetImageRotation == 270 && targetImageRotation == 180) {
+      _rotationAnimation = Tween<double>(
+        begin: _rotationAnimation.value >= 0
+            ? _rotationAnimation.value
+            : 360 + _rotationAnimation.value,
+        end: targetImageRotation,
+      ).animate(_controller);
+    } else {
+      _rotationAnimation = Tween<double>(
+              begin: _rotationAnimation.value, end: targetImageRotation)
+          .animate(_controller);
+    }
+    _controller.forward(from: 0);
+
+    _lastTargetImageRotation = targetImageRotation;
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _orientationAnimation,
+      animation: _rotationAnimation,
       builder: (_, __) {
         return CustomPaint(
           painter: _CameraTiltsPainter(
             deviceTilts: _deviceTilts,
             horizontalTiltThreshold: _horizontalTiltThreshold,
             verticalTiltThreshold: _verticalTiltThreshold,
-            deviceOrientationGrad: _orientationAnimation.value,
+            animatedRotationAngle: _rotationAnimation.value,
+            isAnimated: _controller.isAnimating,
           ),
         );
       },
@@ -166,16 +195,25 @@ class _CameraTiltsPainter extends CustomPainter {
   late final CameraDeviceTilts _deviceTilts;
   late final int _horizontalTiltThreshold;
   late final int _verticalTiltThreshold;
-  late final double _deviceOrientationGrad;
   late final bool _isHorizontalTiltVisible;
   late final bool _isVerticalTiltVisible;
+  late final bool _isAnimated;
+  late final double _animatedRotationAngleRad;
+  late final double _targetImageRotationRad;
 
   _CameraTiltsPainter({
     required CameraDeviceTilts deviceTilts,
+    required double animatedRotationAngle,
     int? horizontalTiltThreshold,
     int? verticalTiltThreshold,
-    double? deviceOrientationGrad,
+    bool? isAnimated,
   }) {
+    _animatedRotationAngleRad = animatedRotationAngle * pi / 180;
+
+    _isAnimated = isAnimated ?? false;
+
+    _targetImageRotationRad = deviceTilts.targetImageRotation * pi / 180;
+
     _isHorizontalTiltVisible = deviceTilts.isHorizontalTiltAvailable;
 
     _isVerticalTiltVisible = deviceTilts.isVerticalTiltAvailable;
@@ -192,19 +230,13 @@ class _CameraTiltsPainter extends CustomPainter {
             ? verticalTiltThreshold
             : 5;
 
-    _deviceOrientationGrad = deviceOrientationGrad ?? 0;
-
-    _horizontalTilt = _isHorizontalTiltVisible
-        ? (deviceTilts.horizontalTilt + _deviceOrientationGrad) % 360
-        : 0;
+    _horizontalTilt = _deviceTilts.horizontalTilt;
 
     _horizontalTiltRad = _horizontalTilt * pi / 180;
 
-    _horizontalTiltToPrint =
-        (_horizontalTilt < 90 ? _horizontalTilt : 360 - _horizontalTilt)
-            .toInt();
+    _horizontalTiltToPrint = _horizontalTilt.abs().toInt();
 
-    _verticalTilt = _isVerticalTiltVisible ? deviceTilts.verticalTilt - 90 : 0;
+    _verticalTilt = deviceTilts.verticalTilt;
   }
 
   @override
@@ -213,10 +245,11 @@ class _CameraTiltsPainter extends CustomPainter {
       final double lineLength = (size.width / 3) * 0.8;
       final Offset centreOffset = Offset(size.width / 2, size.height / 2);
 
-      final double horizontalTiltDeltaX =
-          0.5 * lineLength * sin(pi / 2 - _horizontalTiltRad);
+      final double horizontalTiltDeltaX = 0.5 *
+          lineLength *
+          sin(pi / 2 + _horizontalTiltRad - _targetImageRotationRad);
       final double horizontalTiltDeltaY =
-          0.5 * lineLength * sin(_horizontalTiltRad);
+          0.5 * lineLength * sin(-_horizontalTiltRad + _targetImageRotationRad);
 
       if (_isVerticalTiltVisible) {
         _paintVerticalTiltLine(
@@ -237,16 +270,20 @@ class _CameraTiltsPainter extends CustomPainter {
         }
       }
       if (_isHorizontalTiltVisible) {
-        _paintHorizontalTiltDegree(
-          size: size,
-          canvas: canvas,
-        );
         _paintHorizontalTiltLine(
           canvas: canvas,
           centreOffset: centreOffset,
           deltaX: horizontalTiltDeltaX,
           deltaY: horizontalTiltDeltaY,
           lineLength: lineLength,
+        );
+
+        canvas.translate(centreOffset.dx, centreOffset.dy);
+        canvas.rotate(-_animatedRotationAngleRad);
+        canvas.translate(-centreOffset.dx, -centreOffset.dy);
+        _paintHorizontalTiltDegree(
+          size: size,
+          canvas: canvas,
         );
       }
     }
@@ -289,8 +326,7 @@ class _CameraTiltsPainter extends CustomPainter {
   }
 
   TextSpan _getHorizontalDegreeTextSpan() {
-    if (_horizontalTiltToPrint <= _horizontalTiltThreshold &&
-        _deviceOrientationGrad % 90 == 0) {
+    if (_horizontalTiltToPrint <= _horizontalTiltThreshold && !_isAnimated) {
       return TextSpan(
         text: '$_horizontalTiltToPrint\u{00B0}',
         style: TextStyle(
@@ -329,16 +365,21 @@ class _CameraTiltsPainter extends CustomPainter {
 
     _verticalTiltLinePaint.color = lineColor;
 
-    final double verticalOffset = verticalTiltToPlot * 2;
+    final double verticalOffsetX = 2 *
+        verticalTiltToPlot *
+        sin(_horizontalTiltRad - _targetImageRotationRad);
+    final double verticalOffsetY = 2 *
+        verticalTiltToPlot *
+        sin(-pi / 2 - _horizontalTiltRad + _targetImageRotationRad);
 
     final Offset leftPoint = Offset(
-      centreOffset.dx - horizontalTiltDeltaX,
-      centreOffset.dy + verticalOffset + horizontalTiltDeltaY,
+      centreOffset.dx - horizontalTiltDeltaX + verticalOffsetX,
+      centreOffset.dy + horizontalTiltDeltaY + verticalOffsetY,
     );
 
     final Offset rightPoint = Offset(
-      centreOffset.dx + horizontalTiltDeltaX,
-      centreOffset.dy + verticalOffset - horizontalTiltDeltaY,
+      centreOffset.dx + horizontalTiltDeltaX + verticalOffsetX,
+      centreOffset.dy - horizontalTiltDeltaY + verticalOffsetY,
     );
 
     canvas.drawLine(
@@ -351,24 +392,6 @@ class _CameraTiltsPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CameraTiltsPainter oldDelegate) =>
       oldDelegate._deviceTilts != _deviceTilts ||
-      oldDelegate._deviceOrientationGrad != _deviceOrientationGrad ||
       oldDelegate._horizontalTiltThreshold != _horizontalTiltThreshold ||
       oldDelegate._verticalTiltThreshold != _verticalTiltThreshold;
-}
-
-extension _DeviceOrientationToGradExtension on DeviceOrientation? {
-  int get grad {
-    switch (this) {
-      case DeviceOrientation.portraitUp:
-        return 0;
-      case DeviceOrientation.landscapeRight:
-        return -90;
-      case DeviceOrientation.portraitDown:
-        return 180;
-      case DeviceOrientation.landscapeLeft:
-        return 90;
-      case null:
-        return 0;
-    }
-  }
 }

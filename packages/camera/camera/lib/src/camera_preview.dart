@@ -4,7 +4,7 @@
 
 import 'package:camera/camera.dart';
 import 'package:camera/src/camera_grid.dart';
-import 'package:camera/src/camera_rotator.dart';
+import 'package:camera/src/camera_rotater.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -58,16 +58,13 @@ class CameraPreview extends StatelessWidget {
                       child: controller.buildPreview(),
                     ),
                     CameraGrid(),
-                    CameraRotator(
-                      child: CameraTilts(
-                        cameraController: controller,
-                        horizontalTiltThreshold: horizontalTiltThreshold,
-                        verticalTiltThreshold: verticalTiltThreshold,
-                      ),
-                      controller: controller,
+                    CameraTilts(
+                      cameraController: controller,
+                      horizontalTiltThreshold: horizontalTiltThreshold,
+                      verticalTiltThreshold: verticalTiltThreshold,
                     ),
                     if (controller.value.isTakingPicture)
-                      CameraRotator(
+                      CameraRotater(
                         child: CameraTakePictureAnimation(),
                         controller: controller,
                       ),

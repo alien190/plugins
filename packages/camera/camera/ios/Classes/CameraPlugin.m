@@ -66,7 +66,7 @@ typedef enum {
 @property(readonly, nonatomic) ResolutionPreset resolutionPreset;
 @property(assign, nonatomic) int longSideSize;
 @property(assign, nonatomic) int imageQality;
-@property(assign,atomic) NSMutableDictionary* deviceAnglesAndPathDict;
+@property(strong,atomic) NSMutableDictionary* deviceAnglesAndPathDict;
 @end
 
 @interface FLTImageStreamHandler : NSObject <FlutterStreamHandler>
@@ -202,7 +202,7 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
         [_result sendErrorWithCode:@"IOError" message:@"Unable to write file" details:nil];
         return;
     }
-    [_result sendSuccessWithData:_path];
+    [_result sendSuccessWithData:_deviceAnglesAndPathDict];
 }
 
 @end
@@ -546,7 +546,7 @@ NSString *const errorMethod = @"error";
     if ([_motionManager isAccelerometerAvailable]) {
         _isHorizontalTiltAvailable = true;
         
-        _motionManager.accelerometerUpdateInterval = 0.25f;
+        _motionManager.accelerometerUpdateInterval = 0.1f;
         [_motionManager startAccelerometerUpdatesToQueue:NSOperationQueue.mainQueue
                                              withHandler:^(CMAccelerometerData *accelerometerData, NSError* error) {
             if(accelerometerData!=nil && error == nil) {
@@ -561,13 +561,13 @@ NSString *const errorMethod = @"error";
     if([_motionManager isDeviceMotionAvailable]) {
         _isVerticalTiltAvailable = true;
         
-        _motionManager.deviceMotionUpdateInterval = 0.25f;
+        _motionManager.deviceMotionUpdateInterval = 0.1f;
         [_motionManager startDeviceMotionUpdatesUsingReferenceFrame:CMAttitudeReferenceFrameXArbitraryZVertical
                                                             toQueue:NSOperationQueue.mainQueue
                                                         withHandler:^(CMDeviceMotion * _Nullable motion, NSError * _Nullable error) {
             double verticalTilt = asin(sqrt(pow(motion.attitude.quaternion.x, 2) + pow(motion.attitude.quaternion.y, 2))) * 360 / M_PI - 90;
             self->_verticalTilt = verticalTilt;
-            NSLog(@"VerticalTilt:%f", verticalTilt);
+            //NSLog(@"VerticalTilt:%f", verticalTilt);
             if(verticalTilt<=45 && verticalTilt >=-45) {
                 self->_verticalTiltToPublish = verticalTilt;
             } else {
@@ -745,34 +745,6 @@ NSString *const errorMethod = @"error";
         return;
     }
     
-    UIDeviceOrientation orientation;
-    if(_lockedCaptureOrientation == UIDeviceOrientationUnknown) {
-        orientation = _uiDeviceOrientation;
-    }
-    else {
-        switch(_uiDeviceOrientation) {
-            case UIDeviceOrientationUnknown:
-            case UIDeviceOrientationFaceUp:
-            case UIDeviceOrientationFaceDown:
-            case UIDeviceOrientationPortrait:
-            {
-                orientation = UIDeviceOrientationPortrait;
-                break;
-            }
-            case UIDeviceOrientationLandscapeLeft:
-            {
-                orientation = UIDeviceOrientationLandscapeRight;
-                break;
-            }
-            case UIDeviceOrientationLandscapeRight:
-            {
-                orientation = UIDeviceOrientationLandscapeLeft;
-            }
-            case UIDeviceOrientationPortraitUpsideDown: {
-                orientation = UIDeviceOrientationPortraitUpsideDown;
-            }
-        }
-    }
     
     [_capturePhotoOutput capturePhotoWithSettings:settings
                                          delegate:[[FLTSavePhotoDelegate alloc] initWithPath:path
