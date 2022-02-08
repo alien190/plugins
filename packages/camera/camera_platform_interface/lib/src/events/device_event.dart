@@ -73,6 +73,12 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
   /// The rotation angle of the image
   final double targetImageRotation;
 
+  /// The angle of locked orientation
+  final int lockedCaptureAngle;
+
+  /// A device orientation angle
+  final int deviceOrientationAngle;
+
   /// Build a new tilts changed event.
   DeviceTiltsChangedEvent({
     required this.horizontalTilt,
@@ -81,6 +87,8 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
     required this.isVerticalTiltAvailable,
     required this.mode,
     required this.targetImageRotation,
+    required this.deviceOrientationAngle,
+    required this.lockedCaptureAngle,
   });
 
   /// Converts the supplied [Map] to an instance of the [DeviceTiltsChangedEvent]
@@ -91,6 +99,8 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
         isHorizontalTiltAvailable = json['isHorizontalTiltAvailable'],
         isVerticalTiltAvailable = json['isVerticalTiltAvailable'],
         targetImageRotation = json['targetImageRotation'],
+        deviceOrientationAngle = json['deviceOrientationAngle'],
+        lockedCaptureAngle = json['lockedCaptureAngle'],
         mode = (json['mode'] as String).toTakePictureMode;
 
   /// Converts the [DeviceOrientationChangedEvent] instance into a [Map] instance that
@@ -101,6 +111,8 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
         'isHorizontalTiltAvailable': isHorizontalTiltAvailable,
         'isVerticalTiltAvailable': isVerticalTiltAvailable,
         'targetImageRotation': targetImageRotation,
+        'deviceOrientationAngle': deviceOrientationAngle,
+        'lockedCaptureAngle': lockedCaptureAngle,
         'mode': mode.toStringValue,
       };
 
@@ -114,7 +126,9 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
           isHorizontalTiltAvailable == other.isHorizontalTiltAvailable &&
           isVerticalTiltAvailable == other.isVerticalTiltAvailable &&
           mode == other.mode &&
-          targetImageRotation == other.targetImageRotation;
+          targetImageRotation == other.targetImageRotation &&
+          lockedCaptureAngle == other.lockedCaptureAngle &&
+          deviceOrientationAngle == other.deviceOrientationAngle;
 
   @override
   int get hashCode =>
@@ -123,5 +137,7 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
       isHorizontalTiltAvailable.hashCode ^
       isVerticalTiltAvailable.hashCode ^
       mode.hashCode ^
-      targetImageRotation.hashCode;
+      targetImageRotation.hashCode ^
+      lockedCaptureAngle.hashCode ^
+      deviceOrientationAngle.hashCode;
 }
