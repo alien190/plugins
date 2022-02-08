@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pedantic/pedantic.dart';
 import 'package:quiver/core.dart';
+import 'package:rxdart/rxdart.dart';
 
 final MethodChannel _channel = const MethodChannel('plugins.flutter.io/camera');
 
@@ -266,6 +267,12 @@ class CameraController extends ValueNotifier<CameraValue> {
   StreamSubscription? _deviceOrientationSubscription;
   StreamSubscription? _cameraClosingSubscription;
   StreamSubscription? _cameraErrorSubscription;
+  StreamSubscription? _deviceTiltsSubscription;
+
+  BehaviorSubject<CameraDeviceTilts> _deviceTiltsSubject = BehaviorSubject();
+
+  /// Device tilts stream
+  Stream<CameraDeviceTilts> get deviceTilts => _deviceTiltsSubject.stream;
 
   /// Checks whether [CameraController.dispose] has completed successfully.
   ///
@@ -345,6 +352,8 @@ class CameraController extends ValueNotifier<CameraValue> {
                   'onCameraError event received: ${e.description}',
                 ),
               );
+
+      _deviceTiltsSubscription = CameraPlatform.instance.onDeviceTiltsChanged().listen(_deviceTiltsListener);
     } on PlatformException catch (e) {
       throw CameraException(e.code, e.message);
     }
@@ -851,6 +860,8 @@ class CameraController extends ValueNotifier<CameraValue> {
       await _initCalled;
       await CameraPlatform.instance.dispose(_cameraId);
     }
+    unawaited(_deviceTiltsSubscription?.cancel());
+    unawaited(_deviceTiltsSubject.close());
   }
 
   void _throwIfNotInitialized(String functionName) {
@@ -878,16 +889,15 @@ class CameraController extends ValueNotifier<CameraValue> {
     }
   }
 
-  /// Returns device tilts stream
-  Stream<CameraDeviceTilts> getDeviceTilts() {
-    return CameraPlatform.instance
-        .onDeviceTiltsChanged()
-        .map((DeviceTiltsChangedEvent event) => CameraDeviceTilts(
-              targetImageRotation: event.targetImageRotation,
-              verticalTilt: event.verticalTilt,
-              horizontalTilt: event.horizontalTilt,
-              isHorizontalTiltAvailable: event.isHorizontalTiltAvailable,
-              isVerticalTiltAvailable: event.isVerticalTiltAvailable,
-            ));
+  void _deviceTiltsListener(DeviceTiltsChangedEvent event) {
+    if(!_deviceTiltsSubject.isClosed) {
+      _deviceTiltsSubject.add(CameraDeviceTilts(
+        targetImageRotation: event.targetImageRotation,
+        verticalTilt: event.verticalTilt,
+        horizontalTilt: event.horizontalTilt,
+        isHorizontalTiltAvailable: event.isHorizontalTiltAvailable,
+        isVerticalTiltAvailable: event.isVerticalTiltAvailable,
+      ));
+    }
   }
 }
