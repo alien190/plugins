@@ -100,8 +100,9 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
         isVerticalTiltAvailable = json['isVerticalTiltAvailable'],
         targetImageRotation = json['targetImageRotation'],
         deviceOrientationAngle =
-            int.tryParse(json['deviceOrientationAngle']) ?? 0,
-        lockedCaptureAngle = int.tryParse(json['lockedCaptureAngle']) ?? -1,
+            int.tryParse('${json['deviceOrientationAngle']}') ?? 0,
+        lockedCaptureAngle =
+            int.tryParse('${json['lockedCaptureAngle']}') ?? -1,
         mode = (json['mode'] as String).toTakePictureMode;
 
   /// Converts the [DeviceOrientationChangedEvent] instance into a [Map] instance that
