@@ -897,6 +897,8 @@ class CameraController extends ValueNotifier<CameraValue> {
         horizontalTilt: event.horizontalTilt,
         isHorizontalTiltAvailable: event.isHorizontalTiltAvailable,
         isVerticalTiltAvailable: event.isVerticalTiltAvailable,
+        lockedCaptureAngle: event.lockedCaptureAngle,
+        deviceOrientationAngle: event.deviceOrientationAngle,
       ));
     }
   }

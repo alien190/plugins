@@ -91,9 +91,12 @@ class _AnimatedCameraTiltsState extends State<_AnimatedCameraTilts>
       duration: Duration(milliseconds: 300),
     );
 
+    final double initialRotation = _deviceTilts.lockedCaptureAngle >= 0
+        ? _deviceTilts.targetImageRotation
+        : 0;
     _rotationAnimation = Tween<double>(
-      begin: _deviceTilts.targetImageRotation,
-      end: _deviceTilts.targetImageRotation,
+      begin: initialRotation,
+      end: initialRotation,
     ).animate(_controller);
 
     _lastTargetImageRotation = _deviceTilts.targetImageRotation;
@@ -105,7 +108,8 @@ class _AnimatedCameraTiltsState extends State<_AnimatedCameraTilts>
   void didUpdateWidget(covariant _AnimatedCameraTilts oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (widget.deviceTilts.targetImageRotation != _lastTargetImageRotation) {
+    if (_deviceTilts.lockedCaptureAngle >= 0 &&
+        widget.deviceTilts.targetImageRotation != _lastTargetImageRotation) {
       _updateAnimation(widget.deviceTilts.targetImageRotation);
     }
     if (widget.deviceTilts != _deviceTilts ||
@@ -199,7 +203,7 @@ class _CameraTiltsPainter extends CustomPainter {
   late final bool _isVerticalTiltVisible;
   late final bool _isAnimated;
   late final double _animatedRotationAngleRad;
-  late final double _targetImageRotationRad;
+  late final double _targetRotationRad;
 
   _CameraTiltsPainter({
     required CameraDeviceTilts deviceTilts,
@@ -212,7 +216,9 @@ class _CameraTiltsPainter extends CustomPainter {
 
     _isAnimated = isAnimated ?? false;
 
-    _targetImageRotationRad = deviceTilts.targetImageRotation * pi / 180;
+    _targetRotationRad = deviceTilts.lockedCaptureAngle >= 0
+        ? deviceTilts.targetImageRotation * pi / 180
+        : 0;
 
     _isHorizontalTiltVisible = deviceTilts.isHorizontalTiltAvailable;
 
@@ -230,7 +236,9 @@ class _CameraTiltsPainter extends CustomPainter {
             ? verticalTiltThreshold
             : 5;
 
-    _horizontalTilt = _deviceTilts.horizontalTilt;
+    _horizontalTilt = deviceTilts.lockedCaptureAngle >= 0
+        ? _deviceTilts.horizontalTilt
+        : _deviceTilts.horizontalTilt - _deviceTilts.deviceOrientationAngle;
 
     _horizontalTiltRad = _horizontalTilt * pi / 180;
 
@@ -247,9 +255,9 @@ class _CameraTiltsPainter extends CustomPainter {
 
       final double horizontalTiltDeltaX = 0.5 *
           lineLength *
-          sin(pi / 2 + _horizontalTiltRad - _targetImageRotationRad);
+          sin(pi / 2 + _horizontalTiltRad - _targetRotationRad);
       final double horizontalTiltDeltaY =
-          0.5 * lineLength * sin(-_horizontalTiltRad + _targetImageRotationRad);
+          0.5 * lineLength * sin(-_horizontalTiltRad + _targetRotationRad);
 
       if (_isVerticalTiltVisible) {
         _paintVerticalTiltLine(
@@ -365,12 +373,11 @@ class _CameraTiltsPainter extends CustomPainter {
 
     _verticalTiltLinePaint.color = lineColor;
 
-    final double verticalOffsetX = 2 *
-        verticalTiltToPlot *
-        sin(_horizontalTiltRad - _targetImageRotationRad);
+    final double verticalOffsetX =
+        2 * verticalTiltToPlot * sin(_horizontalTiltRad - _targetRotationRad);
     final double verticalOffsetY = 2 *
         verticalTiltToPlot *
-        sin(-pi / 2 - _horizontalTiltRad + _targetImageRotationRad);
+        sin(-pi / 2 - _horizontalTiltRad + _targetRotationRad);
 
     final Offset leftPoint = Offset(
       centreOffset.dx - horizontalTiltDeltaX + verticalOffsetX,

@@ -642,7 +642,7 @@ NSString *const errorMethod = @"error";
     }
 }
 
--(CGFloat) getRotationAngleForOrintation:(UIDeviceOrientation)orintation {
+-(int) getRotationAngleForOrintation:(UIDeviceOrientation)orintation {
     switch (orintation) {
         case UIDeviceOrientationLandscapeLeft:
             return 270;
@@ -674,7 +674,11 @@ NSString *const errorMethod = @"error";
                     ? (_verticalTilt <= 45 && _verticalTilt >= -45 ? @"normalShot" : @"overheadShot" )
                     : @"unknownShot";
     dict[@"targetImageRotation"] = @(_targetImageRotation);
-    return  dict;
+    dict[@"lockedCaptureAngle"] = @(_lockedCaptureOrientation != UIDeviceOrientationUnknown
+                                    ? [self getRotationAngleForOrintation:_lockedCaptureOrientation]
+                                    : -1);
+    dict[@"deviceOrientationAngle"] = @([self getRotationAngleForOrintation:_uiDeviceOrientation]);
+    return dict;
 }
 
 - (void)start {
