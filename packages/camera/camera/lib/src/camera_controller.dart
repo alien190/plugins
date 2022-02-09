@@ -863,7 +863,6 @@ class CameraController extends ValueNotifier<CameraValue> {
       await CameraPlatform.instance.dispose(_cameraId);
     }
     unawaited(_deviceTiltsSubscription?.cancel());
-    unawaited(_deviceTiltsSubject.close());
   }
 
   void _throwIfNotInitialized(String functionName) {

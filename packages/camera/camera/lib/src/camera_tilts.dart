@@ -52,6 +52,24 @@ class _CameraTiltsState extends State<CameraTilts> {
     _tiltsSubscription = _cameraController.deviceTilts.listen(_tiltsListener);
   }
 
+  @override
+  void didUpdateWidget(covariant CameraTilts oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget._cameraController != _cameraController) {
+      _tiltsSubscription?.cancel();
+      _tiltsSubscription =
+          widget._cameraController.deviceTilts.listen(_tiltsListener);
+    }
+    if (widget._cameraController != _cameraController ||
+        widget._horizontalTiltThreshold != _horizontalTiltThreshold ||
+        widget._verticalTiltThreshold != _verticalTiltThreshold) {
+      _cameraController = widget._cameraController;
+      _verticalTiltThreshold = widget._verticalTiltThreshold;
+      _horizontalTiltThreshold = widget._horizontalTiltThreshold;
+      if (mounted) setState(() {});
+    }
+  }
+
   void _tiltsListener(CameraDeviceTilts tilts) {
     if (_mode != tilts.mode) {
       _mode = tilts.mode;

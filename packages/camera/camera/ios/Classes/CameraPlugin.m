@@ -573,7 +573,11 @@ NSString *const errorMethod = @"error";
             } else {
                 double overheadVerticalTilt = 0;
                 double overheadHorizontalTilt = 0;
-                switch((int)self->_targetImageRotation) {
+                int targetRotation = self->_lockedCaptureOrientation == UIDeviceOrientationUnknown
+                                    ? [self getRotationAngleForOrintation:self->_uiDeviceOrientation]
+                                    : (int)self->_targetImageRotation;
+                
+                switch(targetRotation) {
                     case 0:
                         overheadVerticalTilt = motion.attitude.pitch * 180 / M_PI;
                         overheadHorizontalTilt = -motion.attitude.roll * 180 / M_PI;
@@ -635,7 +639,9 @@ NSString *const errorMethod = @"error";
     }
     
     if(!_isVerticalTiltAvailable || (_verticalTilt <= 45 && _verticalTilt >= -45)) {
-        double horizontalTilt = self->_targetImageRotation - accelerometerAngle;
+        double horizontalTilt = self->_lockedCaptureOrientation == UIDeviceOrientationUnknown
+            ? [self getRotationAngleForOrintation:self->_uiDeviceOrientation] - accelerometerAngle
+            : self->_targetImageRotation - accelerometerAngle;
         self->_horizontalTilt = fabs(horizontalTilt) > 90 ? horizontalTilt + 360 : horizontalTilt;
         self->_horizontalTiltToPublish = self->_horizontalTilt;
         //NSLog(@"horizontalTilt=%f", self->_horizontalTilt);

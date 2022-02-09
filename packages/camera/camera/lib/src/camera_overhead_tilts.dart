@@ -108,7 +108,7 @@ class _CameraOverheadTiltsPainter extends CustomPainter {
           break;
       }
     } else {
-      _horizontalTilt = deviceTilts.horizontalTilt;
+      _horizontalTilt = -deviceTilts.horizontalTilt;
       _verticalTilt = deviceTilts.verticalTilt;
     }
   }

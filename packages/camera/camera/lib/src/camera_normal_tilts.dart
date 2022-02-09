@@ -113,6 +113,9 @@ class _AnimatedCameraNormalTiltsState extends State<_AnimatedCameraNormalTilts>
         widget.deviceTilts.targetImageRotation != _lastTargetImageRotation) {
       _updateAnimation(widget.deviceTilts.targetImageRotation);
     }
+    //else if(_deviceTilts.lockedCaptureAngle < 0) {
+    //  _updateAnimation(0);
+    //}
     if (widget.deviceTilts != _deviceTilts ||
         widget.verticalTiltThreshold != _verticalTiltThreshold ||
         widget.verticalTiltThreshold != _verticalTiltThreshold) {
@@ -237,9 +240,7 @@ class _CameraNormalTiltsPainter extends CustomPainter {
             ? verticalTiltThreshold
             : 5;
 
-    _horizontalTilt = deviceTilts.lockedCaptureAngle >= 0
-        ? _deviceTilts.horizontalTilt
-        : _deviceTilts.horizontalTilt - _deviceTilts.deviceOrientationAngle;
+    _horizontalTilt =  _deviceTilts.horizontalTilt;
 
     _horizontalTiltRad = _horizontalTilt * pi / 180;
 
