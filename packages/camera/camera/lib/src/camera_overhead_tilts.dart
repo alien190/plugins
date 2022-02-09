@@ -88,9 +88,29 @@ class _CameraOverheadTiltsPainter extends CustomPainter {
             ? verticalTiltThreshold
             : 5;
 
-    _horizontalTilt = deviceTilts.horizontalTilt;
-
-    _verticalTilt = deviceTilts.verticalTilt;
+    if(deviceTilts.lockedCaptureAngle>=0) {
+      switch (deviceTilts.targetImageRotation.toInt()) {
+        case 0:
+          _horizontalTilt = -deviceTilts.horizontalTilt;
+          _verticalTilt = deviceTilts.verticalTilt;
+          break;
+        case 90:
+          _horizontalTilt = deviceTilts.verticalTilt;
+          _verticalTilt = deviceTilts.horizontalTilt;
+          break;
+        case 180:
+          _horizontalTilt = deviceTilts.horizontalTilt;
+          _verticalTilt = -deviceTilts.verticalTilt;
+          break;
+        case 270:
+          _horizontalTilt = -deviceTilts.verticalTilt;
+          _verticalTilt = -deviceTilts.horizontalTilt;
+          break;
+      }
+    } else {
+      _horizontalTilt = deviceTilts.horizontalTilt;
+      _verticalTilt = deviceTilts.verticalTilt;
+    }
   }
 
   @override
@@ -99,20 +119,20 @@ class _CameraOverheadTiltsPainter extends CustomPainter {
     final Offset centreOffset = Offset(size.width / 2, size.height / 2);
 
     final double verticalTiltToPlot =
-        _verticalTilt >= -_verticalTiltThreshold * 2 &&
-                _verticalTilt <= _verticalTiltThreshold * 2
+        _verticalTilt >= -_verticalTiltThreshold &&
+                _verticalTilt <= _verticalTiltThreshold
             ? _verticalTilt
-            : _verticalTiltThreshold * 2 * _verticalTilt.sign;
+            : _verticalTiltThreshold * _verticalTilt.sign;
 
     final double horizontalTiltToPlot =
-        _horizontalTilt >= -_horizontalTiltThreshold * 2 &&
-                _horizontalTilt <= _horizontalTiltThreshold * 2
+        _horizontalTilt >= -_horizontalTiltThreshold &&
+                _horizontalTilt <= _horizontalTiltThreshold
             ? _horizontalTilt
-            : _horizontalTiltThreshold * 2 * _horizontalTilt.sign;
+            : _horizontalTiltThreshold * _horizontalTilt.sign;
 
     final Offset tiltsOffset = Offset(
-      size.width / 2 + horizontalTiltToPlot * lineLength,
-      size.height / 2 + verticalTiltToPlot * lineLength,
+      size.width / 2 + horizontalTiltToPlot * lineLength * 0.5,
+      size.height / 2 + verticalTiltToPlot * lineLength * 0.5,
     );
 
     _paintCross(
