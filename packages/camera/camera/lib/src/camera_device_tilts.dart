@@ -1,4 +1,4 @@
-import 'package:flutter/services.dart';
+import 'package:camera_platform_interface/camera_platform_interface.dart';
 
 /// Device tilts model
 class CameraDeviceTilts {
@@ -23,6 +23,9 @@ class CameraDeviceTilts {
   /// A device orientation angle
   final int deviceOrientationAngle;
 
+  /// The mode of the picture taking
+  final TakePictureMode mode;
+
   /// default constructor for [CameraDeviceTilts]
   CameraDeviceTilts({
     required this.targetImageRotation,
@@ -32,6 +35,7 @@ class CameraDeviceTilts {
     required this.isVerticalTiltAvailable,
     required this.lockedCaptureAngle,
     required this.deviceOrientationAngle,
+    required this.mode,
   });
 
   @override
@@ -45,7 +49,8 @@ class CameraDeviceTilts {
           isHorizontalTiltAvailable == other.isHorizontalTiltAvailable &&
           isVerticalTiltAvailable == other.isVerticalTiltAvailable &&
           lockedCaptureAngle == other.lockedCaptureAngle &&
-          deviceOrientationAngle == other.deviceOrientationAngle;
+          deviceOrientationAngle == other.deviceOrientationAngle &&
+          mode == other.mode;
 
   @override
   int get hashCode =>
@@ -55,5 +60,6 @@ class CameraDeviceTilts {
       isHorizontalTiltAvailable.hashCode ^
       isVerticalTiltAvailable.hashCode ^
       lockedCaptureAngle.hashCode ^
-      deviceOrientationAngle.hashCode;
+      deviceOrientationAngle.hashCode ^
+      mode.hashCode;
 }

@@ -353,7 +353,9 @@ class CameraController extends ValueNotifier<CameraValue> {
                 ),
               );
 
-      _deviceTiltsSubscription = CameraPlatform.instance.onDeviceTiltsChanged().listen(_deviceTiltsListener);
+      _deviceTiltsSubscription = CameraPlatform.instance
+          .onDeviceTiltsChanged()
+          .listen(_deviceTiltsListener);
     } on PlatformException catch (e) {
       throw CameraException(e.code, e.message);
     }
@@ -890,7 +892,7 @@ class CameraController extends ValueNotifier<CameraValue> {
   }
 
   void _deviceTiltsListener(DeviceTiltsChangedEvent event) {
-    if(!_deviceTiltsSubject.isClosed) {
+    if (!_deviceTiltsSubject.isClosed) {
       _deviceTiltsSubject.add(CameraDeviceTilts(
         targetImageRotation: event.targetImageRotation,
         verticalTilt: event.verticalTilt,
@@ -899,6 +901,7 @@ class CameraController extends ValueNotifier<CameraValue> {
         isVerticalTiltAvailable: event.isVerticalTiltAvailable,
         lockedCaptureAngle: event.lockedCaptureAngle,
         deviceOrientationAngle: event.deviceOrientationAngle,
+        mode: event.mode,
       ));
     }
   }
