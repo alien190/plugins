@@ -13,6 +13,8 @@ import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugins.camera.features.autofocus.FocusMode;
 import io.flutter.plugins.camera.features.exposurelock.ExposureMode;
+import io.flutter.plugins.camera.types.DeviceTilts;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -93,22 +95,10 @@ public class DartMessenger {
      * @param horizontalTilt specifies the new horizontal tilt of the device.
      * @param verticalTilt specifies the new vertical tilt of the device.
      */
-    public void sendDeviceTiltsChangeEvent(boolean isHorizontalTiltAvailable,
-                                           boolean isVerticalTiltAvailable,
-                                           int horizontalTilt,
-                                           double verticalTilt,
-                                           PlatformChannel.DeviceOrientation orientation) {
+    public void sendDeviceTiltsChangeEvent(DeviceTilts deviceTilts) {
         this.send(
                 DeviceEventType.TILTS_CHANGED,
-                new HashMap<String, Object>() {
-                    {
-                        put("isHorizontalTiltAvailable", isHorizontalTiltAvailable);
-                        put("isVerticalTiltAvailable", isVerticalTiltAvailable);
-                        put("horizontalTilt", horizontalTilt);
-                        put("verticalTilt", verticalTilt);
-                        put("orientation", CameraUtils.serializeDeviceOrientation(orientation));
-                    }
-                });
+                deviceTilts.getMap());
     }
 
 

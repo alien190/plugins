@@ -20,6 +20,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import io.flutter.plugins.camera.types.DeviceTilts;
+import io.flutter.plugins.camera.types.TakePictureResult;
+
 /**
  * Saves a JPEG {@link Image} into the specified {@link File}.
  */
@@ -44,9 +47,11 @@ public class ImageSaver implements Runnable {
 
     private final Integer targetWidth;
 
-    private final Integer targetAngel;
+    private final DeviceTilts deviceTilts;
 
     private final Integer imageQuality;
+    
+    private final double targetImageRotation;
 
     /**
      * Creates an instance of the ImageSaver runnable
@@ -58,16 +63,19 @@ public class ImageSaver implements Runnable {
     ImageSaver(@NonNull Image image,
                @NonNull File file,
                @Nullable Integer targetWidth,
-               @Nullable Integer targetAngel,
+               @Nullable DeviceTilts deviceTilts,
                @Nullable Integer imageQuality,
+               @Nullable Integer sensorOrientationAngle,
                @NonNull Callback callback
     ) {
         this.image = image;
         this.file = file;
         this.callback = callback;
-        this.targetAngel = targetAngel;
+        this.deviceTilts = deviceTilts;
         this.targetWidth = targetWidth;
         this.imageQuality = imageQuality != null && imageQuality >= 0 && imageQuality <= 100 ? imageQuality : 100;
+        this.targetImageRotation = deviceTilts.targetImageRotation
+                + (sensorOrientationAngle != null ? sensorOrientationAngle : 0);
     }
 
     @Override
@@ -75,7 +83,7 @@ public class ImageSaver implements Runnable {
         Log.w(TAG, "run()");
         FileOutputStream output = null;
         try {
-            if (targetWidth == null && targetAngel == null) {
+            if (targetWidth == null && targetImageRotation == 0) {
                 Log.w(TAG, "targetWidth == null && targetAngel == null");
                 ByteBuffer buffer = image.getPlanes()[0].getBuffer();
                 byte[] bytes = new byte[buffer.remaining()];
@@ -83,7 +91,7 @@ public class ImageSaver implements Runnable {
                 output = FileOutputStreamFactory.create(file);
                 output.write(bytes);
 
-                callback.onComplete(file.getAbsolutePath());
+                callback.onComplete(getTakePictureResult());
                 Log.w(TAG, "onComplete()");
                 return;
             }
@@ -105,9 +113,9 @@ public class ImageSaver implements Runnable {
             Log.w(TAG, "scaleFactor:" + scaleFactor);
             dstMatrix.postScale(scaleFactor, scaleFactor);
 
-            if (targetAngel != null) {
-                Log.w(TAG, "targetAngel:" + targetAngel);
-                dstMatrix.postRotate(targetAngel);
+            if (targetImageRotation != 0) {
+                Log.w(TAG, "targetImageRotation:" + targetImageRotation);
+                dstMatrix.postRotate((float) targetImageRotation);
             }
 
             final Bitmap dstBitmap = Bitmap.createBitmap(
@@ -124,7 +132,7 @@ public class ImageSaver implements Runnable {
             output = FileOutputStreamFactory.create(file);
             dstBitmap.compress(Bitmap.CompressFormat.JPEG, imageQuality, output);
 
-            callback.onComplete(file.getAbsolutePath());
+            callback.onComplete(getTakePictureResult());
             Log.w(TAG, "onComplete()");
             srcBitmap.recycle();
             dstBitmap.recycle();
@@ -146,6 +154,17 @@ public class ImageSaver implements Runnable {
         }
     }
 
+    private TakePictureResult getTakePictureResult() {
+        return new TakePictureResult(
+                file.getAbsolutePath(),
+                deviceTilts.horizontalTilt,
+                deviceTilts.verticalTilt,
+                deviceTilts.isHorizontalTiltAvailable,
+                deviceTilts.isVerticalTiltAvailable,
+                deviceTilts.mode
+        );
+    }
+
     /**
      * The interface for the callback that is passed to ImageSaver, for detecting completion or
      * failure of the image saving task.
@@ -154,9 +173,9 @@ public class ImageSaver implements Runnable {
         /**
          * Called when the image file has been saved successfully.
          *
-         * @param absolutePath - The absolute path of the file that was saved.
+         * @param result - the result
          */
-        void onComplete(String absolutePath);
+        void onComplete(TakePictureResult result);
 
         /**
          * Called when an error is encountered while saving the image file.

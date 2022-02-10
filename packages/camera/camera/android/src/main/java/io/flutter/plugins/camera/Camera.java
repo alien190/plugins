@@ -65,6 +65,7 @@ import io.flutter.plugins.camera.features.zoomlevel.ZoomLevelFeature;
 import io.flutter.plugins.camera.media.MediaRecorderBuilder;
 import io.flutter.plugins.camera.types.CameraCaptureProperties;
 import io.flutter.plugins.camera.types.CaptureTimeoutsWrapper;
+import io.flutter.plugins.camera.types.TakePictureResult;
 import io.flutter.view.TextureRegistry.SurfaceTextureEntry;
 
 import java.io.File;
@@ -582,7 +583,7 @@ class Camera
         stillBuilder.set(
                 CaptureRequest.SCALER_CROP_REGION,
                 previewRequestBuilder.get(CaptureRequest.SCALER_CROP_REGION));
-        
+
         // Have all features update the builder.
         updateBuilderSettings(stillBuilder);
 
@@ -1129,12 +1130,13 @@ class Camera
                         reader.acquireNextImage(),
                         captureFile,
                         cameraFeatures.getResolution().getLongSideSize(),
-                        cameraFeatures.getSensorOrientation().getDeviceOrientationManager().getPhotoOrientation(),
+                        cameraFeatures.getSensorOrientation().getDeviceOrientationManager().getDeviceTilts(),
                         cameraFeatures.getResolution().getImageQuality(),
+                        cameraFeatures.getSensorOrientation().getValue(),
                         new ImageSaver.Callback() {
                             @Override
-                            public void onComplete(String absolutePath) {
-                                dartMessenger.finish(flutterResult, absolutePath);
+                            public void onComplete(TakePictureResult result) {
+                                dartMessenger.finish(flutterResult, result.getMap());
                                 Log.w(TAG_CAPTURE, "ImageSaver.onComplete()");
                             }
 

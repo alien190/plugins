@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'dart:ui';
 
 import 'package:camera/src/camera_controller.dart';
@@ -60,18 +59,8 @@ class _CameraOverheadTiltsPainter extends CustomPainter {
 
   late final double _horizontalTilt;
   late final double _verticalTilt;
-
-  // late final double _horizontalTiltRad;
-  // late final int _horizontalTiltToPrint;
-  // late final CameraDeviceTilts _deviceTilts;
   late final int _horizontalTiltThreshold;
   late final int _verticalTiltThreshold;
-
-  // late final bool _isHorizontalTiltVisible;
-  // late final bool _isVerticalTiltVisible;
-  // late final bool _isAnimated;
-  // late final double _animatedRotationAngleRad;
-  // late final double _targetRotationRad;
 
   _CameraOverheadTiltsPainter({
     required CameraDeviceTilts deviceTilts,

@@ -21,13 +21,14 @@ import android.view.Surface;
 import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
-
-import java.util.Arrays;
 
 import io.flutter.embedding.engine.systemchannels.PlatformChannel;
 import io.flutter.embedding.engine.systemchannels.PlatformChannel.DeviceOrientation;
 import io.flutter.plugins.camera.DartMessenger;
+import io.flutter.plugins.camera.types.DeviceTilts;
+import io.flutter.plugins.camera.types.TakePictureMode;
 
 /**
  * Support class to help to determine the media orientation based on the orientation of the device.
@@ -43,18 +44,25 @@ public class DeviceOrientationManager implements SensorEventListener {
     private final Activity activity;
     private final DartMessenger messenger;
     private final boolean isFrontFacing;
-    private final int sensorOrientation;
-    private PlatformChannel.DeviceOrientation lastOrientation;
+    private PlatformChannel.DeviceOrientation accelerometerOrientation;
+    private PlatformChannel.DeviceOrientation uiOrientation;
     private BroadcastReceiver broadcastReceiver;
     private OrientationEventListener orientationEventListener;
     private final SensorManager sensorManager;
 
     private final float[] rotationMatrix = new float[9];
     private final float[] orientationAngles = new float[3];
-    private int lastHorizontalTilt = 0;
-    private double lastVerticalTilt = 90;
+    private double horizontalTilt = 0;
+    private double horizontalTiltOverhead = 0;
+    private double verticalTilt = 0;
+    private double verticalTiltOverhead = 0;
     private boolean isHorizontalTiltAvailable = false;
     private boolean isVerticalTiltAvailable = false;
+    private TakePictureMode takePictureMode = TakePictureMode.unknownShot;
+    private double targetImageRotation = 0;
+    private PlatformChannel.DeviceOrientation lockedCaptureOrientation = null;
+    private int lockedCaptureAngle = -1;
+    private int deviceOrientationAngle = 0;
 
     /**
      * Factory method to create a device orientation manager.
@@ -62,24 +70,22 @@ public class DeviceOrientationManager implements SensorEventListener {
     public static DeviceOrientationManager create(
             @NonNull Activity activity,
             @NonNull DartMessenger messenger,
-            boolean isFrontFacing,
-            int sensorOrientation) {
-        return new DeviceOrientationManager(activity, messenger, isFrontFacing, sensorOrientation);
+            boolean isFrontFacing) {
+        return new DeviceOrientationManager(activity, messenger, isFrontFacing);
     }
 
     private DeviceOrientationManager(
             @NonNull Activity activity,
             @NonNull DartMessenger messenger,
-            boolean isFrontFacing,
-            int sensorOrientation) {
+            boolean isFrontFacing) {
         this.activity = activity;
         this.messenger = messenger;
         this.isFrontFacing = isFrontFacing;
-        this.sensorOrientation = sensorOrientation;
         this.sensorManager = (SensorManager) activity.getSystemService(Context.SENSOR_SERVICE);
         orientationAngles[0] = 0;
         orientationAngles[1] = 1.54f;
         orientationAngles[2] = 1.54f;
+        targetImageRotation = 0;
     }
 
     public void start() {
@@ -107,22 +113,37 @@ public class DeviceOrientationManager implements SensorEventListener {
         } else {
             Log.w(TAG, "Rotation sensor has NOT been initialized");
             isVerticalTiltAvailable = false;
+            takePictureMode = TakePictureMode.unknownShot;
         }
 
         orientationEventListener =
                 new OrientationEventListener(activity, SensorManager.SENSOR_DELAY_NORMAL) {
                     @Override
                     public void onOrientationChanged(int angle) {
-                        //Log.d(TAG, "Orientation changed event angle:" + angle);
                         PlatformChannel.DeviceOrientation newOrientation = calculateSensorOrientation(angle);
-                        if (!newOrientation.equals(lastOrientation) && isOrientationChangeAllowed()) {
+                        if (!newOrientation.equals(accelerometerOrientation) && isOrientationChangeAllowed()) {
                             Log.d(TAG, "sensor orientation set:" + newOrientation.toString());
-                            lastOrientation = newOrientation;
+                            accelerometerOrientation = newOrientation;
                             messenger.sendDeviceOrientationChangeEvent(newOrientation);
                         }
-                        isHorizontalTiltAvailable = angle != ORIENTATION_UNKNOWN;
-                        if (lastHorizontalTilt != angle) {
-                            lastHorizontalTilt = angle;
+                        if (isOrientationChangeAllowed()) {
+                            isHorizontalTiltAvailable = angle != ORIENTATION_UNKNOWN;
+                            if (angle == ORIENTATION_UNKNOWN) {
+                                takePictureMode = TakePictureMode.unknownShot;
+                            }
+                        }
+                        double relativeAngle = getOrientationAngle(accelerometerOrientation) - angle;
+                        if (relativeAngle < -180) {
+                            relativeAngle += 360;
+                        }
+                        horizontalTilt = relativeAngle;
+
+                        if (lockedCaptureOrientation == null) {
+                            targetImageRotation = getOrientationAngle(uiOrientation);
+                        } else {
+                            targetImageRotation = getOrientationAngle(accelerometerOrientation);
+                        }
+                        if (takePictureMode != TakePictureMode.overheadShot) {
                             sendDeviceTiltsChangeEvent();
                         }
                     }
@@ -132,14 +153,64 @@ public class DeviceOrientationManager implements SensorEventListener {
             orientationEventListener.enable();
         } else {
             isHorizontalTiltAvailable = false;
+            takePictureMode = TakePictureMode.unknownShot;
         }
     }
 
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event.sensor.getType() == Sensor.TYPE_GAME_ROTATION_VECTOR
+                || event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
+            SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
+            SensorManager.getOrientation(rotationMatrix, orientationAngles);
+            verticalTilt = Math.asin(Math.sqrt(Math.pow(event.values[0], 2)
+                    + Math.pow(event.values[1], 2))) * 360 / Math.PI
+                    - 90;
+
+            if (verticalTilt >= -45 && verticalTilt <= 45) {
+                takePictureMode = TakePictureMode.normalShot;
+            } else {
+                takePictureMode = TakePictureMode.overheadShot;
+                final double pitch = orientationAngles[1] * 180 / Math.PI;
+                final double roll = orientationAngles[2] * 180 / Math.PI;
+
+                switch ((int) targetImageRotation) {
+                    case 0:
+                        verticalTiltOverhead = -pitch;
+                        horizontalTiltOverhead = -roll;
+                        break;
+                    case 90:
+                        verticalTiltOverhead = roll;
+                        horizontalTiltOverhead = -pitch;
+                        break;
+                    case 180:
+                        verticalTiltOverhead = pitch;
+                        horizontalTiltOverhead = roll;
+                        break;
+                    case 270:
+                        verticalTiltOverhead = -roll;
+                        horizontalTiltOverhead = pitch;
+                        break;
+                }
+            }
+            sendDeviceTiltsChangeEvent();
+        }
+    }
+
+    private void calculateDeviceTilts() {
+
+
+    }
+
+    private void sendDeviceTiltsChangeEvent() {
+        final DeviceTilts deviceTilts = getDeviceTilts();
+        //Log.d(TAG, "Device tilts:" + deviceTilts.toString());
+        messenger.sendDeviceTiltsChangeEvent(deviceTilts);
+    }
+
     private boolean isOrientationChangeAllowed() {
-        return orientationAngles[1] >= 0.7 ||
-                orientationAngles[1] <= -0.7 ||
-                orientationAngles[2] >= 0.7 ||
-                orientationAngles[2] <= -0.7;
+        return takePictureMode == TakePictureMode.normalShot
+                || takePictureMode == TakePictureMode.unknownShot;
     }
 
     private void startUIListener() {
@@ -149,10 +220,10 @@ public class DeviceOrientationManager implements SensorEventListener {
                     @Override
                     public void onReceive(Context context, Intent intent) {
                         PlatformChannel.DeviceOrientation orientation = getUIOrientation();
-                        if (!orientation.equals(lastOrientation) && isOrientationChangeAllowed()) {
+                        if (!orientation.equals(uiOrientation) && isOrientationChangeAllowed()) {
                             Log.d(TAG, "UI orientation set:" + orientation.toString());
-                            lastOrientation = orientation;
-                            messenger.sendDeviceOrientationChangeEvent(orientation);
+                            uiOrientation = orientation;
+                            messenger.sendDeviceOrientationChangeEvent(uiOrientation);
                         }
                     }
                 };
@@ -221,47 +292,44 @@ public class DeviceOrientationManager implements SensorEventListener {
      * @return The device's photo orientation in degrees.
      */
     public int getPhotoOrientation() {
-        return this.getPhotoOrientation(this.lastOrientation);
+        return (int) this.targetImageRotation;
     }
 
-    /**
-     * Returns the device's photo orientation in degrees based on the sensor orientation and the
-     * supplied {@link PlatformChannel.DeviceOrientation} value.
-     *
-     * <p>Returns one of 0, 90, 180 or 270.
-     *
-     * @param orientation The {@link PlatformChannel.DeviceOrientation} value that is to be converted
-     *                    into degrees.
-     * @return The device's photo orientation in degrees.
-     */
-    public int getPhotoOrientation(PlatformChannel.DeviceOrientation orientation) {
+    //    /**
+//     * Returns the device's photo orientation in degrees based on the sensor orientation and the
+//     * supplied {@link PlatformChannel.DeviceOrientation} value.
+//     *
+//     * <p>Returns one of 0, 90, 180 or 270.
+//     *
+//     * @param orientation The {@link PlatformChannel.DeviceOrientation} value that is to be converted
+//     *                    into degrees.
+//     * @return The device's photo orientation in degrees.
+//     */
+    private int getOrientationAngle(@Nullable PlatformChannel.DeviceOrientation orientation) {
         int angle = 0;
-        // Fallback to device orientation when the orientation value is null.
         if (orientation == null) {
-            orientation = getUIOrientation();
+            return angle;
         }
-
         switch (orientation) {
-            case PORTRAIT_UP:
-                angle = 90;
-                break;
             case PORTRAIT_DOWN:
-                angle = 270;
+                angle = 180;
                 break;
             case LANDSCAPE_LEFT:
-                angle = isFrontFacing ? 180 : 0;
+                angle = 270;
                 break;
             case LANDSCAPE_RIGHT:
-                angle = isFrontFacing ? 0 : 180;
+                angle = 90;
                 break;
         }
-
-        // Sensor orientation is 90 for most devices, or 270 for some devices (eg. Nexus 5X).
-        // This has to be taken into account so the JPEG is rotated properly.
-        // For devices with orientation of 90, this simply returns the mapping from ORIENTATIONS.
-        // For devices with orientation of 270, the JPEG is rotated 180 degrees instead.
-        return (angle + sensorOrientation + 270) % 360;
+        return angle;
     }
+//
+//        // Sensor orientation is 90 for most devices, or 270 for some devices (eg. Nexus 5X).
+//        // This has to be taken into account so the JPEG is rotated properly.
+//        // For devices with orientation of 90, this simply returns the mapping from ORIENTATIONS.
+//        // For devices with orientation of 270, the JPEG is rotated 180 degrees instead.
+//        return (angle + sensorOrientation + 270) % 360;
+//    }
 
     /**
      * Returns the device's video orientation in degrees based on the sensor orientation and the last
@@ -272,7 +340,7 @@ public class DeviceOrientationManager implements SensorEventListener {
      * @return The device's video orientation in degrees.
      */
     public int getVideoOrientation() {
-        return this.getVideoOrientation(this.lastOrientation);
+        return this.getVideoOrientation(this.accelerometerOrientation);
     }
 
     /**
@@ -286,40 +354,14 @@ public class DeviceOrientationManager implements SensorEventListener {
      * @return The device's video orientation in degrees.
      */
     public int getVideoOrientation(PlatformChannel.DeviceOrientation orientation) {
-        int angle = 0;
-
-        // Fallback to device orientation when the orientation value is null.
-        if (orientation == null) {
-            orientation = getUIOrientation();
-        }
-
-        switch (orientation) {
-            case PORTRAIT_UP:
-                angle = 0;
-                break;
-            case PORTRAIT_DOWN:
-                angle = 180;
-                break;
-            case LANDSCAPE_LEFT:
-                angle = 90;
-                break;
-            case LANDSCAPE_RIGHT:
-                angle = 270;
-                break;
-        }
-
-        if (isFrontFacing) {
-            angle *= -1;
-        }
-
-        return (angle + sensorOrientation + 360) % 360;
+        return 0;
     }
 
     /**
      * @return the last received UI orientation.
      */
     public PlatformChannel.DeviceOrientation getLastUIOrientation() {
-        return this.lastOrientation;
+        return this.accelerometerOrientation;
     }
 
     /**
@@ -331,8 +373,8 @@ public class DeviceOrientationManager implements SensorEventListener {
     @VisibleForTesting
     void handleUIOrientationChange() {
         PlatformChannel.DeviceOrientation orientation = getUIOrientation();
-        handleOrientationChange(orientation, lastOrientation, messenger);
-        lastOrientation = orientation;
+        handleOrientationChange(orientation, accelerometerOrientation, messenger);
+        accelerometerOrientation = orientation;
     }
 
     /**
@@ -452,31 +494,36 @@ public class DeviceOrientationManager implements SensorEventListener {
     }
 
     @Override
-    public void onSensorChanged(SensorEvent event) {
-        if (event.sensor.getType() == Sensor.TYPE_GAME_ROTATION_VECTOR
-                || event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
-            SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
-            SensorManager.getOrientation(rotationMatrix, orientationAngles);
-            final double verticalTilt = Math.asin(Math.sqrt(Math.pow(event.values[0], 2) + Math.pow(event.values[1], 2))) * 360 / Math.PI;
-            if (lastVerticalTilt - verticalTiltPrecision > verticalTilt
-                    || lastVerticalTilt + verticalTiltPrecision < verticalTilt) {
-                lastVerticalTilt = verticalTilt;
-                sendDeviceTiltsChangeEvent();
-            }
-        }
+    public void onAccuracyChanged(Sensor sensor, int i) {
     }
 
-    private void sendDeviceTiltsChangeEvent() {
-        //Log.d(TAG, "Device tilts. Horizontal:" + lastHorizontalTilt + ", vertical:" + lastVerticalTilt);
-        messenger.sendDeviceTiltsChangeEvent(
+    public void lockCaptureOrientation(PlatformChannel.DeviceOrientation orientation) {
+        this.lockedCaptureOrientation = orientation;
+        this.lockedCaptureAngle = getOrientationAngle(lockedCaptureOrientation);
+        calculateDeviceTilts();
+        sendDeviceTiltsChangeEvent();
+    }
+
+    /**
+     * Unlock the capture orientation, indicating that the device orientation should be used to
+     * configure the capture orientation.
+     */
+    public void unlockCaptureOrientation() {
+        this.lockedCaptureOrientation = null;
+        lockedCaptureAngle = -1;
+        calculateDeviceTilts();
+        sendDeviceTiltsChangeEvent();
+    }
+
+    public DeviceTilts getDeviceTilts() {
+        return new DeviceTilts(
+                takePictureMode == TakePictureMode.overheadShot ? horizontalTiltOverhead : horizontalTilt,
+                takePictureMode == TakePictureMode.overheadShot ? verticalTiltOverhead : verticalTilt,
                 isHorizontalTiltAvailable,
                 isVerticalTiltAvailable,
-                lastHorizontalTilt,
-                lastVerticalTilt,
-                lastOrientation);
-    }
-
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int i) {
+                takePictureMode,
+                targetImageRotation,
+                lockedCaptureAngle,
+                deviceOrientationAngle);
     }
 }
