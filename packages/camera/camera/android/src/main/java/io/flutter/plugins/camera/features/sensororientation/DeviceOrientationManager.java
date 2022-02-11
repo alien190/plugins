@@ -171,6 +171,8 @@ public class DeviceOrientationManager implements SensorEventListener {
                 takePictureMode = TakePictureMode.normalShot;
             } else {
                 takePictureMode = TakePictureMode.overheadShot;
+                isVerticalTiltAvailable = true;
+                isHorizontalTiltAvailable = true;
                 final double pitch = orientationAngles[1] * 180 / Math.PI;
                 final double roll = orientationAngles[2] * 180 / Math.PI;
 
@@ -195,11 +197,6 @@ public class DeviceOrientationManager implements SensorEventListener {
             }
             sendDeviceTiltsChangeEvent();
         }
-    }
-
-    private void calculateDeviceTilts() {
-
-
     }
 
     private void sendDeviceTiltsChangeEvent() {
@@ -500,7 +497,6 @@ public class DeviceOrientationManager implements SensorEventListener {
     public void lockCaptureOrientation(PlatformChannel.DeviceOrientation orientation) {
         this.lockedCaptureOrientation = orientation;
         this.lockedCaptureAngle = getOrientationAngle(lockedCaptureOrientation);
-        calculateDeviceTilts();
         sendDeviceTiltsChangeEvent();
     }
 
@@ -511,7 +507,6 @@ public class DeviceOrientationManager implements SensorEventListener {
     public void unlockCaptureOrientation() {
         this.lockedCaptureOrientation = null;
         lockedCaptureAngle = -1;
-        calculateDeviceTilts();
         sendDeviceTiltsChangeEvent();
     }
 
