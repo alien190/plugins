@@ -9,42 +9,56 @@ import 'package:flutter/material.dart';
 /// Camera tilts widget
 class CameraTilts extends StatefulWidget {
   final CameraController _cameraController;
-  final int? _horizontalTiltThreshold;
-  final int? _verticalTiltThreshold;
+  final int? _normalHorizontalTiltThreshold;
+  final int? _normalVerticalTiltThreshold;
+  final int? _overheadHorizontalTiltThreshold;
+  final int? _overheadVerticalTiltThreshold;
 
   /// Default constructor
   const CameraTilts({
     Key? key,
     required CameraController cameraController,
-    int? horizontalTiltThreshold,
-    int? verticalTiltThreshold,
+    int? normalHorizontalTiltThreshold,
+    int? normalVerticalTiltThreshold,
+    int? overheadHorizontalTiltThreshold,
+    int? overheadVerticalTiltThreshold,
   })  : _cameraController = cameraController,
-        _horizontalTiltThreshold = horizontalTiltThreshold,
-        _verticalTiltThreshold = verticalTiltThreshold,
+        _normalHorizontalTiltThreshold = normalHorizontalTiltThreshold,
+        _normalVerticalTiltThreshold = normalVerticalTiltThreshold,
+        _overheadHorizontalTiltThreshold = overheadHorizontalTiltThreshold,
+        _overheadVerticalTiltThreshold = overheadVerticalTiltThreshold,
         super(key: key);
 
   @override
   _CameraTiltsState createState() => _CameraTiltsState(
         cameraController: _cameraController,
-        horizontalTiltThreshold: _horizontalTiltThreshold,
-        verticalTiltThreshold: _verticalTiltThreshold,
+        overheadHorizontalTiltThreshold: _overheadHorizontalTiltThreshold,
+        overheadVerticalTiltThreshold: _overheadVerticalTiltThreshold,
+        normalHorizontalTiltThreshold: _normalHorizontalTiltThreshold,
+        normalVerticalTiltThreshold: _normalVerticalTiltThreshold,
       );
 }
 
 class _CameraTiltsState extends State<CameraTilts> {
   CameraController _cameraController;
-  int? _horizontalTiltThreshold;
-  int? _verticalTiltThreshold;
+  int? _normalHorizontalTiltThreshold;
+  int? _normalVerticalTiltThreshold;
+  int? _overheadHorizontalTiltThreshold;
+  int? _overheadVerticalTiltThreshold;
   TakePictureMode? _mode;
   StreamSubscription? _tiltsSubscription;
 
   _CameraTiltsState({
     required CameraController cameraController,
-    int? horizontalTiltThreshold,
-    int? verticalTiltThreshold,
+    int? normalHorizontalTiltThreshold,
+    int? normalVerticalTiltThreshold,
+    int? overheadHorizontalTiltThreshold,
+    int? overheadVerticalTiltThreshold,
   })  : _cameraController = cameraController,
-        _horizontalTiltThreshold = horizontalTiltThreshold,
-        _verticalTiltThreshold = verticalTiltThreshold;
+        _normalHorizontalTiltThreshold = normalHorizontalTiltThreshold,
+        _normalVerticalTiltThreshold = normalVerticalTiltThreshold,
+        _overheadHorizontalTiltThreshold = overheadHorizontalTiltThreshold,
+        _overheadVerticalTiltThreshold = overheadVerticalTiltThreshold;
 
   @override
   void initState() {
@@ -61,11 +75,19 @@ class _CameraTiltsState extends State<CameraTilts> {
           widget._cameraController.deviceTilts.listen(_tiltsListener);
     }
     if (widget._cameraController != _cameraController ||
-        widget._horizontalTiltThreshold != _horizontalTiltThreshold ||
-        widget._verticalTiltThreshold != _verticalTiltThreshold) {
+        widget._normalHorizontalTiltThreshold !=
+            _normalHorizontalTiltThreshold ||
+        widget._normalVerticalTiltThreshold != _normalVerticalTiltThreshold ||
+        widget._overheadHorizontalTiltThreshold !=
+            _overheadHorizontalTiltThreshold ||
+        widget._overheadVerticalTiltThreshold !=
+            _overheadVerticalTiltThreshold) {
       _cameraController = widget._cameraController;
-      _verticalTiltThreshold = widget._verticalTiltThreshold;
-      _horizontalTiltThreshold = widget._horizontalTiltThreshold;
+      _normalVerticalTiltThreshold = widget._normalVerticalTiltThreshold;
+      _normalHorizontalTiltThreshold = widget._normalHorizontalTiltThreshold;
+      _overheadVerticalTiltThreshold = widget._overheadVerticalTiltThreshold;
+      _overheadHorizontalTiltThreshold =
+          widget._overheadHorizontalTiltThreshold;
       if (mounted) setState(() {});
     }
   }
@@ -83,14 +105,14 @@ class _CameraTiltsState extends State<CameraTilts> {
         _mode == TakePictureMode.normalShot) {
       return CameraNormalTilts(
         cameraController: _cameraController,
-        verticalTiltThreshold: _verticalTiltThreshold,
-        horizontalTiltThreshold: _horizontalTiltThreshold,
+        verticalTiltThreshold: _normalVerticalTiltThreshold,
+        horizontalTiltThreshold: _normalHorizontalTiltThreshold,
       );
     } else if (_mode == TakePictureMode.overheadShot) {
       return CameraOverheadTilts(
         cameraController: _cameraController,
-        verticalTiltThreshold: _verticalTiltThreshold,
-        horizontalTiltThreshold: _horizontalTiltThreshold,
+        verticalTiltThreshold: _overheadVerticalTiltThreshold,
+        horizontalTiltThreshold: _overheadHorizontalTiltThreshold,
       );
     }
     return Container();

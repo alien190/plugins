@@ -25,8 +25,10 @@ class CameraPreview extends StatelessWidget {
   const CameraPreview(
     this.controller, {
     this.child,
-    this.horizontalTiltThreshold,
-    this.verticalTiltThreshold,
+    this.normalHorizontalTiltThreshold,
+    this.normalVerticalTiltThreshold,
+    this.overheadHorizontalTiltThreshold,
+    this.overheadVerticalTiltThreshold,
   });
 
   /// The controller for the camera that the preview is shown for.
@@ -35,11 +37,17 @@ class CameraPreview extends StatelessWidget {
   /// A widget to overlay on top of the camera preview
   final Widget? child;
 
-  /// Horizontal tilt threshold to show warning
-  final int? horizontalTiltThreshold;
+  /// Horizontal tilt threshold to show warning for normal shot mode
+  final int? normalHorizontalTiltThreshold;
 
-  /// Vertical tilt threshold to show warning
-  final int? verticalTiltThreshold;
+  /// Vertical tilt threshold to show warning for normal shot mode
+  final int? normalVerticalTiltThreshold;
+
+  /// Horizontal tilt threshold to show warning for overhead shot mode
+  final int? overheadHorizontalTiltThreshold;
+
+  /// Vertical tilt threshold to show warning for overhead shot mode
+  final int? overheadVerticalTiltThreshold;
 
   @override
   Widget build(BuildContext context) {
@@ -60,8 +68,13 @@ class CameraPreview extends StatelessWidget {
                     CameraGrid(),
                     CameraTilts(
                       cameraController: controller,
-                      horizontalTiltThreshold: horizontalTiltThreshold,
-                      verticalTiltThreshold: verticalTiltThreshold,
+                      normalHorizontalTiltThreshold:
+                          normalHorizontalTiltThreshold,
+                      normalVerticalTiltThreshold: normalVerticalTiltThreshold,
+                      overheadHorizontalTiltThreshold:
+                          overheadHorizontalTiltThreshold,
+                      overheadVerticalTiltThreshold:
+                          overheadVerticalTiltThreshold,
                     ),
                     if (controller.value.isTakingPicture)
                       CameraRotater(

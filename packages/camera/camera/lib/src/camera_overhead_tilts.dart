@@ -70,14 +70,14 @@ class _CameraOverheadTiltsPainter extends CustomPainter {
     _horizontalTiltThreshold =
         horizontalTiltThreshold != null && horizontalTiltThreshold > 0
             ? horizontalTiltThreshold
-            : 5;
+            : 15;
 
     _verticalTiltThreshold =
         verticalTiltThreshold != null && verticalTiltThreshold > 0
             ? verticalTiltThreshold
-            : 5;
+            : 15;
 
-    if(deviceTilts.lockedCaptureAngle>=0) {
+    if (deviceTilts.lockedCaptureAngle >= 0) {
       switch (deviceTilts.targetImageRotation.toInt()) {
         case 0:
           _horizontalTilt = -deviceTilts.horizontalTilt;
@@ -105,6 +105,7 @@ class _CameraOverheadTiltsPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final double lineLength = (size.width / 3) * 0.3;
+    final double maximumVariation = size.width / 3;
     final Offset centreOffset = Offset(size.width / 2, size.height / 2);
 
     final double verticalTiltToPlot =
@@ -120,8 +121,10 @@ class _CameraOverheadTiltsPainter extends CustomPainter {
             : _horizontalTiltThreshold * _horizontalTilt.sign;
 
     final Offset tiltsOffset = Offset(
-      size.width / 2 + horizontalTiltToPlot * lineLength * 0.5,
-      size.height / 2 + verticalTiltToPlot * lineLength * 0.5,
+      size.width / 2 +
+          horizontalTiltToPlot * maximumVariation / _horizontalTiltThreshold,
+      size.height / 2 +
+          verticalTiltToPlot * maximumVariation / _verticalTiltThreshold,
     );
 
     _paintCross(
