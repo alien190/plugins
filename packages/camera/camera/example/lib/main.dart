@@ -676,7 +676,12 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
 
   void showInSnackBar(String message) {
     // ignore: deprecated_member_use
-    _scaffoldKey.currentState?.showSnackBar(SnackBar(content: Text(message)));
+    _scaffoldKey.currentState?.showSnackBar(SnackBar(
+      content: Text(message),
+      duration: Duration(
+        seconds: 10,
+      ),
+    ));
   }
 
   void onViewFinderTap(TapDownDetails details, BoxConstraints constraints) {
@@ -755,14 +760,14 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
   }
 
   void onTakePictureButtonPressed() {
-    takePicture().then((XFile? file) {
+    takePicture().then((TakePictureResult? result) {
       if (mounted) {
         setState(() {
-          imageFile = file;
+          imageFile = result?.file;
           videoController?.dispose();
           videoController = null;
         });
-        if (file != null) showInSnackBar('Picture saved to ${file.path}');
+        if (result != null) showInSnackBar('$result');
       }
     });
   }
@@ -1041,7 +1046,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     await vController.play();
   }
 
-  Future<XFile?> takePicture() async {
+  Future<TakePictureResult?> takePicture() async {
     final CameraController? cameraController = controller;
     if (cameraController == null || !cameraController.value.isInitialized) {
       showInSnackBar('Error: select a camera first.');
@@ -1056,7 +1061,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     try {
       final TakePictureResult result = await cameraController.takePicture();
       print('Take picture result: $result');
-      return result.file;
+      return result;
     } on CameraException catch (e) {
       _showCameraException(e);
       return null;

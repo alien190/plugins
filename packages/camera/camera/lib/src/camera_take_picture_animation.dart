@@ -71,4 +71,10 @@ class _CameraTakePictureAnimationState extends State<CameraTakePictureAnimation>
       ),
     );
   }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 }
