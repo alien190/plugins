@@ -92,7 +92,7 @@ class _AnimatedCameraNormalTiltsState extends State<_AnimatedCameraNormalTilts>
       duration: Duration(milliseconds: 300),
     );
 
-    final double initialRotation = _deviceTilts.lockedCaptureAngle >= 0
+    final double initialRotation = _isRotationShouldBeAnimated
         ? _deviceTilts.targetImageRotation
         : 0;
     _rotationAnimation = Tween<double>(
@@ -105,11 +105,13 @@ class _AnimatedCameraNormalTiltsState extends State<_AnimatedCameraNormalTilts>
     _controller.forward();
   }
 
+  bool get _isRotationShouldBeAnimated => _deviceTilts.lockedCaptureAngle >= 0 || (_deviceTilts.lockedCaptureAngle <0 && !_deviceTilts.isUIRotationEqualAccRotation);
+
   @override
   void didUpdateWidget(covariant _AnimatedCameraNormalTilts oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (_deviceTilts.lockedCaptureAngle >= 0 &&
+    if (_isRotationShouldBeAnimated &&
         widget.deviceTilts.targetImageRotation != _lastTargetImageRotation) {
       _updateAnimation(widget.deviceTilts.targetImageRotation);
     }
@@ -220,7 +222,7 @@ class _CameraNormalTiltsPainter extends CustomPainter {
 
     _isAnimated = isAnimated ?? false;
 
-    _targetRotationRad = deviceTilts.lockedCaptureAngle >= 0
+    _targetRotationRad = deviceTilts.lockedCaptureAngle >= 0 || (deviceTilts.lockedCaptureAngle < 0 && !deviceTilts.isUIRotationEqualAccRotation)
         ? deviceTilts.targetImageRotation * pi / 180
         : 0;
 

@@ -640,8 +640,14 @@ NSString *const errorMethod = @"error";
     
     if(!_isVerticalTiltAvailable || (_verticalTilt <= 45 && _verticalTilt >= -45)) {
         double horizontalTilt = self->_lockedCaptureOrientation == UIDeviceOrientationUnknown
-            ? [self getRotationAngleForOrintation:self->_uiDeviceOrientation] - accelerometerAngle
-            : self->_targetImageRotation - accelerometerAngle;
+            /// Image capture orientation is not locked
+            ?(self->_accelerometerDeviceOrientation == self->_uiDeviceOrientation ?
+              /// UI is not locked, so the UI orientation is equal the accelerometer orientation
+              [self getRotationAngleForOrintation:self->_uiDeviceOrientation] - accelerometerAngle
+              /// UI is locked, so the UI orientation is not equal accelerometer orientation
+              :[self getRotationAngleForOrintation:self->_accelerometerDeviceOrientation] - accelerometerAngle)
+        : self->_targetImageRotation - accelerometerAngle;
+        
         self->_horizontalTilt = fabs(horizontalTilt) > 90 ? horizontalTilt + 360 : horizontalTilt;
         self->_horizontalTiltToPublish = self->_horizontalTilt;
         //NSLog(@"horizontalTilt=%f", self->_horizontalTilt);
@@ -684,6 +690,7 @@ NSString *const errorMethod = @"error";
                                     ? [self getRotationAngleForOrintation:_lockedCaptureOrientation]
                                     : -1);
     dict[@"deviceOrientationAngle"] = @([self getRotationAngleForOrintation:_uiDeviceOrientation]);
+    dict[@"isUIRotationEqualAccRotation"] =@((bool)(self->_accelerometerDeviceOrientation == self->_uiDeviceOrientation ? true : false));
     return dict;
 }
 
