@@ -79,6 +79,9 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
   /// A device orientation angle
   final int deviceOrientationAngle;
 
+  /// Indicates if UI rotation angle is equal to accelerometer rotation angle
+  final bool isUIRotationEqualAccRotation;
+
   /// Build a new tilts changed event.
   DeviceTiltsChangedEvent({
     required this.horizontalTilt,
@@ -89,6 +92,7 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
     required this.targetImageRotation,
     required this.deviceOrientationAngle,
     required this.lockedCaptureAngle,
+    required this.isUIRotationEqualAccRotation,
   });
 
   /// Converts the supplied [Map] to an instance of the [DeviceTiltsChangedEvent]
@@ -101,6 +105,7 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
         targetImageRotation = json['targetImageRotation'],
         deviceOrientationAngle = json['deviceOrientationAngle'],
         lockedCaptureAngle = json['lockedCaptureAngle'],
+        isUIRotationEqualAccRotation = json['isUIRotationEqualAccRotation'],
         mode = (json['mode'] as String).toTakePictureMode;
 
   /// Converts the [DeviceOrientationChangedEvent] instance into a [Map] instance that
@@ -113,6 +118,7 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
         'targetImageRotation': targetImageRotation,
         'deviceOrientationAngle': deviceOrientationAngle,
         'lockedCaptureAngle': lockedCaptureAngle,
+        'isUIRotationEqualAccRotation': isUIRotationEqualAccRotation,
         'mode': mode.toStringValue,
       };
 
@@ -128,7 +134,8 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
           mode == other.mode &&
           targetImageRotation == other.targetImageRotation &&
           lockedCaptureAngle == other.lockedCaptureAngle &&
-          deviceOrientationAngle == other.deviceOrientationAngle;
+          deviceOrientationAngle == other.deviceOrientationAngle &&
+          isUIRotationEqualAccRotation == other.isUIRotationEqualAccRotation;
 
   @override
   int get hashCode =>
@@ -139,5 +146,6 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
       mode.hashCode ^
       targetImageRotation.hashCode ^
       lockedCaptureAngle.hashCode ^
-      deviceOrientationAngle.hashCode;
+      deviceOrientationAngle.hashCode ^
+      isUIRotationEqualAccRotation.hashCode;
 }

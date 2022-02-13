@@ -26,6 +26,9 @@ class CameraDeviceTilts {
   /// The mode of the picture taking
   final TakePictureMode mode;
 
+  /// Indicates if UI rotation angle is equal to accelerometer rotation angle
+  final bool isUIRotationEqualAccRotation;
+
   /// default constructor for [CameraDeviceTilts]
   CameraDeviceTilts({
     required this.targetImageRotation,
@@ -36,6 +39,7 @@ class CameraDeviceTilts {
     required this.lockedCaptureAngle,
     required this.deviceOrientationAngle,
     required this.mode,
+    required this.isUIRotationEqualAccRotation,
   });
 
   @override
@@ -50,7 +54,8 @@ class CameraDeviceTilts {
           isVerticalTiltAvailable == other.isVerticalTiltAvailable &&
           lockedCaptureAngle == other.lockedCaptureAngle &&
           deviceOrientationAngle == other.deviceOrientationAngle &&
-          mode == other.mode;
+          mode == other.mode &&
+          isUIRotationEqualAccRotation == other.isUIRotationEqualAccRotation;
 
   @override
   int get hashCode =>
@@ -61,5 +66,6 @@ class CameraDeviceTilts {
       isVerticalTiltAvailable.hashCode ^
       lockedCaptureAngle.hashCode ^
       deviceOrientationAngle.hashCode ^
-      mode.hashCode;
+      mode.hashCode ^
+      isUIRotationEqualAccRotation.hashCode;
 }

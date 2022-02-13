@@ -901,6 +901,7 @@ class CameraController extends ValueNotifier<CameraValue> {
         lockedCaptureAngle: event.lockedCaptureAngle,
         deviceOrientationAngle: event.deviceOrientationAngle,
         mode: event.mode,
+        isUIRotationEqualAccRotation: event.isUIRotationEqualAccRotation,
       ));
     }
   }
