@@ -11,6 +11,7 @@ public class DeviceTilts {
     public final double targetImageRotation;
     public final int lockedCaptureAngle;
     public final int deviceOrientationAngle;
+    public final boolean isUIRotationEqualAccRotation;
 
 
     public DeviceTilts(double horizontalTilt,
@@ -20,7 +21,8 @@ public class DeviceTilts {
                        TakePictureMode mode,
                        double targetImageRotation,
                        int lockedCaptureAngle,
-                       int deviceOrientationAngle) {
+                       int deviceOrientationAngle,
+                       boolean isUIRotationEqualAccRotation) {
         this.horizontalTilt = horizontalTilt;
         this.verticalTilt = verticalTilt;
         this.isHorizontalTiltAvailable = isHorizontalTiltAvailable;
@@ -29,6 +31,7 @@ public class DeviceTilts {
         this.targetImageRotation = targetImageRotation;
         this.lockedCaptureAngle = lockedCaptureAngle;
         this.deviceOrientationAngle = deviceOrientationAngle;
+        this.isUIRotationEqualAccRotation = isUIRotationEqualAccRotation;
     }
 
     public HashMap<String, Object> getMap() {
@@ -42,6 +45,7 @@ public class DeviceTilts {
                 put("targetImageRotation", targetImageRotation);
                 put("lockedCaptureAngle", lockedCaptureAngle);
                 put("deviceOrientationAngle", deviceOrientationAngle);
+                put("isUIRotationEqualAccRotation", isUIRotationEqualAccRotation);
             }
         };
     }

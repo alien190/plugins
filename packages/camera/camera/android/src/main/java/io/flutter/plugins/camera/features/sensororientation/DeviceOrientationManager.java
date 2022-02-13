@@ -519,6 +519,8 @@ public class DeviceOrientationManager implements SensorEventListener {
                 takePictureMode,
                 targetImageRotation,
                 lockedCaptureAngle,
-                deviceOrientationAngle);
+                deviceOrientationAngle,
+                getOrientationAngle(uiOrientation)==getOrientationAngle(accelerometerOrientation)
+        );
     }
 }
