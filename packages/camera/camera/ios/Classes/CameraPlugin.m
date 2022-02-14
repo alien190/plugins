@@ -609,6 +609,8 @@ NSString *const errorMethod = @"error";
 
 -(void) calculateAccelerometerAngles:(CMAcceleration)acceleration {
     double accelerometerAngle = fmod(atan2(-acceleration.x, acceleration.y) * 180 / M_PI + 180, 360);
+    self ->_uiDeviceOrientation = [[UIDevice currentDevice] orientation];
+    
     //NSLog(@"accelerometerAngle=%f", accelerometerAngle);
     
     if(!_isVerticalTiltAvailable || (_verticalTilt <= 45 && _verticalTilt >= -45)) {
@@ -1189,6 +1191,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         CFRelease(_latestPixelBuffer);
     }
     [_motionManager stopAccelerometerUpdates];
+    [_motionManager stopDeviceMotionUpdates];
 }
 
 - (CVPixelBufferRef)copyPixelBuffer {

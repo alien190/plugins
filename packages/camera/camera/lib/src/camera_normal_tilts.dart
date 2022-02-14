@@ -92,9 +92,8 @@ class _AnimatedCameraNormalTiltsState extends State<_AnimatedCameraNormalTilts>
       duration: Duration(milliseconds: 300),
     );
 
-    final double initialRotation = _isRotationShouldBeAnimated
-        ? _deviceTilts.targetImageRotation
-        : 0;
+    final double initialRotation =
+        _isRotationShouldBeAnimated ? _deviceTilts.targetImageRotation : 0;
     _rotationAnimation = Tween<double>(
       begin: initialRotation,
       end: initialRotation,
@@ -105,15 +104,22 @@ class _AnimatedCameraNormalTiltsState extends State<_AnimatedCameraNormalTilts>
     _controller.forward();
   }
 
-  bool get _isRotationShouldBeAnimated => _deviceTilts.lockedCaptureAngle >= 0 || (_deviceTilts.lockedCaptureAngle <0 && !_deviceTilts.isUIRotationEqualAccRotation);
+  bool get _isRotationShouldBeAnimated =>
+      widget.deviceTilts.lockedCaptureAngle >= 0 ||
+      (widget.deviceTilts.lockedCaptureAngle < 0 &&
+          !widget.deviceTilts.isUIRotationEqualAccRotation);
 
   @override
   void didUpdateWidget(covariant _AnimatedCameraNormalTilts oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (_isRotationShouldBeAnimated &&
-        widget.deviceTilts.targetImageRotation != _lastTargetImageRotation) {
-      _updateAnimation(widget.deviceTilts.targetImageRotation);
+    if (_isRotationShouldBeAnimated) {
+      if (widget.deviceTilts.targetImageRotation != _lastTargetImageRotation) {
+        _updateAnimation(widget.deviceTilts.targetImageRotation);
+      }
+    }
+    else if(_lastTargetImageRotation!=0){
+      _updateAnimation(0);
     }
     //else if(_deviceTilts.lockedCaptureAngle < 0) {
     //  _updateAnimation(0);
@@ -222,7 +228,9 @@ class _CameraNormalTiltsPainter extends CustomPainter {
 
     _isAnimated = isAnimated ?? false;
 
-    _targetRotationRad = deviceTilts.lockedCaptureAngle >= 0 || (deviceTilts.lockedCaptureAngle < 0 && !deviceTilts.isUIRotationEqualAccRotation)
+    _targetRotationRad = deviceTilts.lockedCaptureAngle >= 0 ||
+            (deviceTilts.lockedCaptureAngle < 0 &&
+                !deviceTilts.isUIRotationEqualAccRotation)
         ? deviceTilts.targetImageRotation * pi / 180
         : 0;
 
@@ -242,7 +250,7 @@ class _CameraNormalTiltsPainter extends CustomPainter {
             ? verticalTiltThreshold
             : 5;
 
-    _horizontalTilt =  _deviceTilts.horizontalTilt;
+    _horizontalTilt = _deviceTilts.horizontalTilt;
 
     _horizontalTiltRad = _horizontalTilt * pi / 180;
 
