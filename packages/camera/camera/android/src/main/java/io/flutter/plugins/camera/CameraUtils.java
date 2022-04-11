@@ -14,6 +14,7 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
 import android.media.Image;
+import android.util.Log;
 
 import io.flutter.embedding.engine.systemchannels.PlatformChannel;
 
@@ -28,6 +29,8 @@ import java.util.Map;
  * Provides various utilities for camera.
  */
 public final class CameraUtils {
+
+    private static final String TAG = CameraUtils.class.getSimpleName();
 
     private CameraUtils() {
     }
@@ -108,35 +111,39 @@ public final class CameraUtils {
         String[] cameraNames = cameraManager.getCameraIdList();
         List<Map<String, Object>> cameras = new ArrayList<>();
         for (String cameraName : cameraNames) {
-            int cameraId;
             try {
-                cameraId = Integer.parseInt(cameraName, 10);
-            } catch (NumberFormatException e) {
-                cameraId = -1;
-            }
-            if (cameraId < 0) {
-                continue;
-            }
+                int cameraId;
+                try {
+                    cameraId = Integer.parseInt(cameraName, 10);
+                } catch (NumberFormatException e) {
+                    cameraId = -1;
+                }
+                if (cameraId < 0) {
+                    continue;
+                }
 
-            HashMap<String, Object> details = new HashMap<>();
-            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraName);
-            details.put("name", cameraName);
-            int sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
-            details.put("sensorOrientation", sensorOrientation);
+                HashMap<String, Object> details = new HashMap<>();
+                CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraName);
+                details.put("name", cameraName);
+                int sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+                details.put("sensorOrientation", sensorOrientation);
 
-            int lensFacing = characteristics.get(CameraCharacteristics.LENS_FACING);
-            switch (lensFacing) {
-                case CameraMetadata.LENS_FACING_FRONT:
-                    details.put("lensFacing", "front");
-                    break;
-                case CameraMetadata.LENS_FACING_BACK:
-                    details.put("lensFacing", "back");
-                    break;
-                case CameraMetadata.LENS_FACING_EXTERNAL:
-                    details.put("lensFacing", "external");
-                    break;
+                int lensFacing = characteristics.get(CameraCharacteristics.LENS_FACING);
+                switch (lensFacing) {
+                    case CameraMetadata.LENS_FACING_FRONT:
+                        details.put("lensFacing", "front");
+                        break;
+                    case CameraMetadata.LENS_FACING_BACK:
+                        details.put("lensFacing", "back");
+                        break;
+                    case CameraMetadata.LENS_FACING_EXTERNAL:
+                        details.put("lensFacing", "external");
+                        break;
+                }
+                cameras.add(details);
+            } catch (Exception e) {
+                Log.e(TAG, "Error adding camera to list of available cameras: " + e.toString());
             }
-            cameras.add(details);
         }
         return cameras;
     }
