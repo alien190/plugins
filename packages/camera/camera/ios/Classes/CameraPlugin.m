@@ -1184,14 +1184,14 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     for (AVCaptureOutput *output in [_captureSession outputs]) {
         [_captureSession removeOutput:output];
     }
+    [_motionManager stopAccelerometerUpdates];
+    [_motionManager stopDeviceMotionUpdates];
 }
 
 - (void)dealloc {
     if (_latestPixelBuffer) {
         CFRelease(_latestPixelBuffer);
     }
-    [_motionManager stopAccelerometerUpdates];
-    [_motionManager stopDeviceMotionUpdates];
 }
 
 - (CVPixelBufferRef)copyPixelBuffer {
