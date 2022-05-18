@@ -143,9 +143,6 @@ class FakeController extends ValueNotifier<CameraValue>
   int get longSideSize => 1600;
 
   @override
-  Stream<CameraDeviceTilts> getDeviceTilts() => Stream.fromIterable([]);
-
-  @override
   Stream<CameraDeviceTilts> get deviceTilts => Stream.fromIterable([]);
 }
 

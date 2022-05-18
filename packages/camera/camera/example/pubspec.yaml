@@ -3,8 +3,8 @@ description: Demonstrates how to use the camera plugin.
 publish_to: none
 
 environment:
-  sdk: ">=2.14.0 <3.0.0"
-  flutter: ">=2.5.0"
+  sdk: ">=2.16.0 <3.0.0"
+  flutter: ">=3.0.0"
 
 dependencies:
   camera:
@@ -13,10 +13,10 @@ dependencies:
 #      url: git@github.com:alien190/plugins
 #      path: packages/camera/camera
 #      ref: 2940e2687c0833a5bad187daa587636006442d09
-  path_provider: ^2.0.0
+  path_provider: ^2.0.10
   flutter:
     sdk: flutter
-  video_player: ^2.1.4
+  video_player: ^2.4.2
   share: ^2.0.4
 
 flutter_icons:

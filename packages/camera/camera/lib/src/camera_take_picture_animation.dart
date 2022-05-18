@@ -30,7 +30,7 @@ class _CameraTakePictureAnimationState extends State<CameraTakePictureAnimation>
       ),
     );
     WidgetsBinding.instance
-        ?.addPostFrameCallback((_) => _animationController.forward());
+        .addPostFrameCallback((_) => _animationController.forward());
     super.initState();
   }
 
