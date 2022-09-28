@@ -431,12 +431,39 @@ class CameraController extends ValueNotifier<CameraValue> {
       value = value.copyWith(
         isTakingPicture: true,
       );
-      TakePictureResult result =
-          await CameraPlatform.instance.takePicture(_cameraId);
-      value = value.copyWith(
-        isTakingPicture: false,
-      );
-      return result;
+      final completer = Completer<TakePictureResult>();
+
+      final handleError = (error) {
+        if (!completer.isCompleted) {
+          if (error is CameraErrorEvent) {
+            completer.completeError(error.description);
+          } else {
+            completer.completeError(error);
+          }
+        }
+      };
+
+      final handleResult = (result) {
+        if (!completer.isCompleted) {
+          completer.complete(result);
+        }
+      };
+
+      final errorSubscription =
+          CameraPlatform.instance.onCameraError(_cameraId).listen(handleError);
+
+      final handleComplete = (_) {
+        errorSubscription.cancel();
+        value = value.copyWith(isTakingPicture: false);
+      };
+
+      unawaited(completer.future.then(handleComplete, onError: handleComplete));
+
+      unawaited(CameraPlatform.instance
+          .takePicture(_cameraId)
+          .then(handleResult, onError: handleError));
+
+      return completer.future;
     } on PlatformException catch (e) {
       value = value.copyWith(
         isTakingPicture: false,
