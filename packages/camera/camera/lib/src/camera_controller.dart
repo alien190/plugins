@@ -651,11 +651,12 @@ class CameraController extends ValueNotifier<CameraValue> {
 
   /// Returns a widget showing a live camera preview.
   Widget buildPreview() {
-    _throwIfNotInitialized("buildPreview");
+    if (!value.isInitialized || _isDisposed) return const SizedBox();
     try {
       return CameraPlatform.instance.buildPreview(_cameraId);
     } on PlatformException catch (e) {
-      throw CameraException(e.code, e.message);
+      value = value.copyWith(errorDescription: '${e.code}, ${e.message}');
+      return const SizedBox();
     }
   }
 
