@@ -42,7 +42,8 @@ public class DartMessenger {
          */
         ORIENTATION_CHANGED("orientation_changed"),
         TILTS_CHANGED("tilts_changed"),
-        ERROR("error");
+        LOG_ERROR_MESSAGE("log_error_message"),
+        LOG_INFO_MESSAGE("log_info_message");
 
         private final String method;
 
@@ -114,8 +115,7 @@ public class DartMessenger {
     /**
      * Sends a message to the Flutter client informing the orientation angles of the device has been changed.
      *
-     * @param horizontalTilt specifies the new horizontal tilt of the device.
-     * @param verticalTilt   specifies the new vertical tilt of the device.
+     * @param deviceTilts specifies the new tilts of the device.
      */
     public void sendDeviceTiltsChangeEvent(DeviceTilts deviceTilts) {
         this.send(
@@ -123,11 +123,19 @@ public class DartMessenger {
                 deviceTilts.getMap());
     }
 
-    public void sendDeviceErrorEvent(String errorDescription) {
-        this.send(DeviceEventType.ERROR,
+    public void sendDeviceLogInfoMessageEvent(String message) {
+        this.sendDeviceLogMessageEvent(DeviceEventType.LOG_INFO_MESSAGE, message);
+    }
+
+    public void sendDeviceLogErrorMessageEvent(String message) {
+        this.sendDeviceLogMessageEvent(DeviceEventType.LOG_ERROR_MESSAGE, message);
+    }
+
+    void sendDeviceLogMessageEvent(DeviceEventType eventType, String message) {
+        this.send(eventType,
                 new HashMap<String, Object>() {
                     {
-                        put("error", errorDescription);
+                        put("message", message);
                     }
                 });
     }

@@ -185,6 +185,18 @@ class MethodChannelCamera extends CameraPlatform {
   }
 
   @override
+  Stream<DeviceLogErrorMessageEvent> onDeviceLogError() {
+    return deviceEventStreamController.stream
+        .whereType<DeviceLogErrorMessageEvent>();
+  }
+
+  @override
+  Stream<DeviceLogInfoMessageEvent> onDeviceLogInfo() {
+    return deviceEventStreamController.stream
+        .whereType<DeviceLogInfoMessageEvent>();
+  }
+
+  @override
   Future<void> lockCaptureOrientation(
     int cameraId,
     DeviceOrientation orientation,
@@ -488,6 +500,26 @@ class MethodChannelCamera extends CameraPlatform {
           deviceEventStreamController.add(event);
         } catch (e) {
           print("DeviceTiltsChangedEvent error: ${e.toString()}");
+        }
+        break;
+      case 'log_error_message':
+        try {
+          final event = DeviceLogErrorMessageEvent.fromJson(
+            Map<dynamic, dynamic>.from(call.arguments),
+          );
+          deviceEventStreamController.add(event);
+        } catch (e) {
+          print("DeviceLogErrorMessageEvent error: ${e.toString()}");
+        }
+        break;
+      case 'log_info_message':
+        try {
+          final event = DeviceLogInfoMessageEvent.fromJson(
+            Map<dynamic, dynamic>.from(call.arguments),
+          );
+          deviceEventStreamController.add(event);
+        } catch (e) {
+          print("DeviceLogInfoMessageEvent error: ${e.toString()}");
         }
         break;
       default:

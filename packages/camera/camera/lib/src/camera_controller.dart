@@ -268,11 +268,21 @@ class CameraController extends ValueNotifier<CameraValue> {
   StreamSubscription? _cameraClosingSubscription;
   StreamSubscription? _cameraErrorSubscription;
   StreamSubscription? _deviceTiltsSubscription;
+  StreamSubscription? _deviceLogErrorSubscription;
+  StreamSubscription? _deviceLogInfoSubscription;
 
   BehaviorSubject<CameraDeviceTilts> _deviceTiltsSubject = BehaviorSubject();
+  BehaviorSubject<String> _deviceLogErrorSubject = BehaviorSubject();
+  BehaviorSubject<String> _deviceLogInfoSubject = BehaviorSubject();
 
   /// Device tilts stream
   Stream<CameraDeviceTilts> get deviceTilts => _deviceTiltsSubject.stream;
+
+  /// Device info log stream
+  Stream<String> get deviceLogInfo => _deviceLogInfoSubject.stream;
+
+  /// Device error log stream
+  Stream<String> get deviceLogError => _deviceLogErrorSubject.stream;
 
   /// Checks whether [CameraController.dispose] has completed successfully.
   ///
@@ -355,6 +365,10 @@ class CameraController extends ValueNotifier<CameraValue> {
 
       _deviceTiltsSubscription = CameraPlatform.instance
           .onDeviceTiltsChanged()
+          .listen(_deviceTiltsListener);
+
+      _deviceLogInfoSubject = CameraPlatform.instance
+          .onDevice
           .listen(_deviceTiltsListener);
     } on PlatformException catch (e) {
       throw CameraException(e.code, e.message);
@@ -891,6 +905,8 @@ class CameraController extends ValueNotifier<CameraValue> {
       await CameraPlatform.instance.dispose(_cameraId);
     }
     unawaited(_deviceTiltsSubscription?.cancel());
+    unawaited(_deviceLogErrorSubscription?.cancel());
+    unawaited(_deviceLogInfoSubscription?.cancel());
   }
 
   void _throwIfNotInitialized(String functionName) {
@@ -931,6 +947,18 @@ class CameraController extends ValueNotifier<CameraValue> {
         mode: event.mode,
         isUIRotationEqualAccRotation: event.isUIRotationEqualAccRotation,
       ));
+    }
+  }
+
+  void _deviceLogErrorListener(DeviceLogErrorMessageEvent event) {
+    if (!_deviceLogErrorSubject.isClosed) {
+      _deviceLogErrorSubject.add(event.message);
+    }
+  }
+
+  void _deviceLogInfoListener(DeviceLogInfoMessageEvent event) {
+    if (!_deviceLogInfoSubject.isClosed) {
+      _deviceLogInfoSubject.add(event.message);
     }
   }
 }

@@ -114,6 +114,16 @@ abstract class CameraPlatform extends PlatformInterface {
     throw UnimplementedError('onDeviceTiltsChanged() is not implemented.');
   }
 
+  /// The device error event.
+  Stream<DeviceLogErrorMessageEvent> onDeviceLogError() {
+    throw UnimplementedError('onDeviceLogError() is not implemented.');
+  }
+
+  /// The device info event.
+  Stream<DeviceLogInfoMessageEvent> onDeviceLogInfo() {
+    throw UnimplementedError('onDeviceLogInfo() is not implemented.');
+  }
+
   /// Locks the capture orientation.
   Future<void> lockCaptureOrientation(
       int cameraId, DeviceOrientation orientation) {
