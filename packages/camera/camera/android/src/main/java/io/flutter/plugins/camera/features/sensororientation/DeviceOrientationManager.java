@@ -24,6 +24,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
+import java.io.IOException;
+
 import io.flutter.embedding.engine.systemchannels.PlatformChannel;
 import io.flutter.embedding.engine.systemchannels.PlatformChannel.DeviceOrientation;
 import io.flutter.plugins.camera.DartMessenger;
@@ -89,8 +91,9 @@ public class DeviceOrientationManager implements SensorEventListener {
     }
 
     public void start() {
-        startSensorListener();
-        startUIListener();
+        throw new Error("sensor start error");
+        //startSensorListener();
+        //startUIListener();
     }
 
     public void stop() {
