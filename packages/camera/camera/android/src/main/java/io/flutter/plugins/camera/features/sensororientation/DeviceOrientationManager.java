@@ -90,13 +90,8 @@ public class DeviceOrientationManager implements SensorEventListener {
     }
 
     public void start() {
-        try {
-
-            startSensorListener();
-            startUIListener();
-        } catch (Exception exception) {
-            //messenger.sendDeviceErrorEvent();
-        }
+        startSensorListener();
+        startUIListener();
     }
 
     public void stop() {
@@ -107,17 +102,25 @@ public class DeviceOrientationManager implements SensorEventListener {
     private void startSensorListener() {
         if (orientationEventListener != null) return;
 
+        messenger.sendDeviceLogInfoMessageEvent("Start sensor listener");
+
         Sensor rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
         if (rotationSensor == null) {
+            messenger.sendDeviceLogInfoMessageEvent(
+                    "Game rotation vector sensor is not available. " +
+                            "Trying to use rotation vector sensor."
+            );
             rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
         }
         if (rotationSensor != null) {
             Log.i(TAG, "Rotation sensor has been initialized");
+            messenger.sendDeviceLogInfoMessageEvent("Rotation sensor has been initialized");
             sensorManager.registerListener(this, rotationSensor,
                     SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
             isVerticalTiltAvailable = true;
         } else {
             Log.w(TAG, "Rotation sensor has NOT been initialized");
+            messenger.sendDeviceLogErrorMessageEvent("Rotation sensor has NOT been initialized");
             isVerticalTiltAvailable = false;
             takePictureMode = TakePictureMode.unknownShot;
         }
@@ -157,53 +160,54 @@ public class DeviceOrientationManager implements SensorEventListener {
         if (orientationEventListener.canDetectOrientation()) {
             isHorizontalTiltAvailable = true;
             orientationEventListener.enable();
+            messenger.sendDeviceLogInfoMessageEvent("OrientationEventListener can detect orientation");
         } else {
             isHorizontalTiltAvailable = false;
             takePictureMode = TakePictureMode.unknownShot;
+            messenger.sendDeviceLogErrorMessageEvent("OrientationEventListener can not detect orientation");
         }
     }
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        throw new Error("sensor error");
-//        if (event.sensor.getType() == Sensor.TYPE_GAME_ROTATION_VECTOR
-//                || event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
-//            SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
-//            SensorManager.getOrientation(rotationMatrix, orientationAngles);
-//            verticalTilt = Math.asin(Math.sqrt(Math.pow(event.values[0], 2)
-//                    + Math.pow(event.values[1], 2))) * 360 / Math.PI
-//                    - 90;
-//
-//            if (verticalTilt >= -45 && verticalTilt <= 45) {
-//                takePictureMode = TakePictureMode.normalShot;
-//            } else {
-//                takePictureMode = TakePictureMode.overheadShot;
-//                isVerticalTiltAvailable = true;
-//                isHorizontalTiltAvailable = true;
-//                final double pitch = orientationAngles[1] * 180 / Math.PI;
-//                final double roll = orientationAngles[2] * 180 / Math.PI;
-//
-//                switch ((int) targetImageRotation) {
-//                    case 0:
-//                        verticalTiltOverhead = -pitch;
-//                        horizontalTiltOverhead = -roll;
-//                        break;
-//                    case 90:
-//                        verticalTiltOverhead = roll;
-//                        horizontalTiltOverhead = -pitch;
-//                        break;
-//                    case 180:
-//                        verticalTiltOverhead = pitch;
-//                        horizontalTiltOverhead = roll;
-//                        break;
-//                    case 270:
-//                        verticalTiltOverhead = -roll;
-//                        horizontalTiltOverhead = pitch;
-//                        break;
-//                }
-//            }
-//            sendDeviceTiltsChangeEvent();
-//        }
+        if (event.sensor.getType() == Sensor.TYPE_GAME_ROTATION_VECTOR
+                || event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
+            SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values);
+            SensorManager.getOrientation(rotationMatrix, orientationAngles);
+            verticalTilt = Math.asin(Math.sqrt(Math.pow(event.values[0], 2)
+                    + Math.pow(event.values[1], 2))) * 360 / Math.PI
+                    - 90;
+
+            if (verticalTilt >= -45 && verticalTilt <= 45) {
+                takePictureMode = TakePictureMode.normalShot;
+            } else {
+                takePictureMode = TakePictureMode.overheadShot;
+                isVerticalTiltAvailable = true;
+                isHorizontalTiltAvailable = true;
+                final double pitch = orientationAngles[1] * 180 / Math.PI;
+                final double roll = orientationAngles[2] * 180 / Math.PI;
+
+                switch ((int) targetImageRotation) {
+                    case 0:
+                        verticalTiltOverhead = -pitch;
+                        horizontalTiltOverhead = -roll;
+                        break;
+                    case 90:
+                        verticalTiltOverhead = roll;
+                        horizontalTiltOverhead = -pitch;
+                        break;
+                    case 180:
+                        verticalTiltOverhead = pitch;
+                        horizontalTiltOverhead = roll;
+                        break;
+                    case 270:
+                        verticalTiltOverhead = -roll;
+                        horizontalTiltOverhead = pitch;
+                        break;
+                }
+            }
+            sendDeviceTiltsChangeEvent();
+        }
     }
 
     private void sendDeviceTiltsChangeEvent() {
@@ -527,7 +531,7 @@ public class DeviceOrientationManager implements SensorEventListener {
                 targetImageRotation,
                 lockedCaptureAngle,
                 deviceOrientationAngle,
-                getOrientationAngle(uiOrientation)==getOrientationAngle(accelerometerOrientation)
+                getOrientationAngle(uiOrientation) == getOrientationAngle(accelerometerOrientation)
         );
     }
 }

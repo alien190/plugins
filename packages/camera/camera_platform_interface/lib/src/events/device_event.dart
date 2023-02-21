@@ -149,3 +149,39 @@ class DeviceTiltsChangedEvent extends DeviceEvent {
       deviceOrientationAngle.hashCode ^
       isUIRotationEqualAccRotation.hashCode;
 }
+
+/// The [DeviceLogErrorMessageEvent] is fired when the Plugin sends device error event
+class DeviceLogErrorMessageEvent extends DeviceEvent {
+  /// message
+  final String message;
+
+  /// Constructor
+  DeviceLogErrorMessageEvent(this.message);
+
+  /// Converts the supplied [Map] to an instance of the [DeviceLogErrorMessageEvent]
+  /// class.
+  DeviceLogErrorMessageEvent.fromJson(Map<dynamic, dynamic> json)
+      : message = json['message'];
+
+  /// Converts the [DeviceLogErrorMessageEvent] instance into a [Map] instance that
+  /// can be serialized to JSON.
+  Map<String, dynamic> toJson() => {'message': message};
+}
+
+/// The [DeviceLogInfoMessageEvent] is fired when the Plugin sends device info event
+class DeviceLogInfoMessageEvent extends DeviceEvent {
+  /// message
+  final String message;
+
+  /// Constructor
+  DeviceLogInfoMessageEvent(this.message);
+
+  /// Converts the supplied [Map] to an instance of the [DeviceLogInfoMessageEvent]
+  /// class.
+  DeviceLogInfoMessageEvent.fromJson(Map<dynamic, dynamic> json)
+      : message = json['message'];
+
+  /// Converts the [DeviceLogInfoMessageEvent] instance into a [Map] instance that
+  /// can be serialized to JSON.
+  Map<String, dynamic> toJson() => {'message': message};
+}

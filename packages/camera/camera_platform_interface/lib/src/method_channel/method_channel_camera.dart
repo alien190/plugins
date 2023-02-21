@@ -490,6 +490,26 @@ class MethodChannelCamera extends CameraPlatform {
           print("DeviceTiltsChangedEvent error: ${e.toString()}");
         }
         break;
+      case 'log_error_message':
+        try {
+          final event = DeviceLogErrorMessageEvent.fromJson(
+            Map<dynamic, dynamic>.from(call.arguments),
+          );
+          deviceEventStreamController.add(event);
+        } catch (e) {
+          print("DeviceLogErrorMessageEvent error: ${e.toString()}");
+        }
+        break;
+      case 'log_info_message':
+        try {
+          final event = DeviceLogInfoMessageEvent.fromJson(
+            Map<dynamic, dynamic>.from(call.arguments),
+          );
+          deviceEventStreamController.add(event);
+        } catch (e) {
+          print("DeviceLogInfoMessageEvent error: ${e.toString()}");
+        }
+        break;
       default:
         throw MissingPluginException();
     }
