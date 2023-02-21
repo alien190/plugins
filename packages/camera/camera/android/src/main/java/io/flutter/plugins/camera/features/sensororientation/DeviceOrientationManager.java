@@ -248,6 +248,67 @@ public class DeviceOrientationManager implements SensorEventListener {
         broadcastReceiver = null;
     }
 
+
+//    /**
+//     * Starts listening to the device's sensors or UI for orientation updates.
+//     *
+//     * <p>When orientation information is updated the new orientation is send to the client using the
+//     * {@link DartMessenger}. This latest value can also be retrieved through the {@link
+//     * #getVideoOrientation()} accessor.
+//     *
+//     * <p>If the device's ACCELEROMETER_ROTATION setting is enabled the {@link
+//     * DeviceOrientationManager} will report orientation updates based on the sensor information. If
+//     * the ACCELEROMETER_ROTATION is disabled the {@link DeviceOrientationManager} will fallback to
+//     * the deliver orientation updates based on the UI orientation.
+//     */
+//    public void start() {
+//        if (broadcastReceiver != null) {
+//            return;
+//        }
+//        broadcastReceiver =
+//                new BroadcastReceiver() {
+//                    @Override
+//                    public void onReceive(Context context, Intent intent) {
+//                        handleUIOrientationChange();
+//                    }
+//                };
+//        activity.registerReceiver(broadcastReceiver, orientationIntentFilter);
+//        broadcastReceiver.onReceive(activity, null);
+//    }
+//
+//    /**
+//     * Stops listening for orientation updates.
+//     */
+//    public void stop() {
+//        if (broadcastReceiver == null) {
+//            return;
+//        }
+//        activity.unregisterReceiver(broadcastReceiver);
+//        broadcastReceiver = null;
+//    }
+
+    /**
+     * Returns the device's photo orientation in degrees based on the sensor orientation and the last
+     * known UI orientation.
+     *
+     * <p>Returns one of 0, 90, 180 or 270.
+     *
+     * @return The device's photo orientation in degrees.
+     */
+    public int getPhotoOrientation() {
+        return (int) this.targetImageRotation;
+    }
+
+    //    /**
+//     * Returns the device's photo orientation in degrees based on the sensor orientation and the
+//     * supplied {@link PlatformChannel.DeviceOrientation} value.
+//     *
+//     * <p>Returns one of 0, 90, 180 or 270.
+//     *
+//     * @param orientation The {@link PlatformChannel.DeviceOrientation} value that is to be converted
+//     *                    into degrees.
+//     * @return The device's photo orientation in degrees.
+//     */
     private int getOrientationAngle(@Nullable PlatformChannel.DeviceOrientation orientation) {
         int angle = 0;
         if (orientation == null) {
@@ -265,6 +326,25 @@ public class DeviceOrientationManager implements SensorEventListener {
                 break;
         }
         return angle;
+    }
+//
+//        // Sensor orientation is 90 for most devices, or 270 for some devices (eg. Nexus 5X).
+//        // This has to be taken into account so the JPEG is rotated properly.
+//        // For devices with orientation of 90, this simply returns the mapping from ORIENTATIONS.
+//        // For devices with orientation of 270, the JPEG is rotated 180 degrees instead.
+//        return (angle + sensorOrientation + 270) % 360;
+//    }
+
+    /**
+     * Returns the device's video orientation in degrees based on the sensor orientation and the last
+     * known UI orientation.
+     *
+     * <p>Returns one of 0, 90, 180 or 270.
+     *
+     * @return The device's video orientation in degrees.
+     */
+    public int getVideoOrientation() {
+        return this.getVideoOrientation(this.accelerometerOrientation);
     }
 
     /**
