@@ -41,7 +41,8 @@ public class DartMessenger {
          * Indicates the device's orientation has changed.
          */
         ORIENTATION_CHANGED("orientation_changed"),
-        TILTS_CHANGED("tilts_changed");
+        TILTS_CHANGED("tilts_changed"),
+        ERROR("error");
 
         private final String method;
 
@@ -120,6 +121,15 @@ public class DartMessenger {
         this.send(
                 DeviceEventType.TILTS_CHANGED,
                 deviceTilts.getMap());
+    }
+
+    public void sendDeviceErrorEvent(String errorDescription) {
+        this.send(DeviceEventType.ERROR,
+                new HashMap<String, Object>() {
+                    {
+                        put("error", errorDescription);
+                    }
+                });
     }
 
 
