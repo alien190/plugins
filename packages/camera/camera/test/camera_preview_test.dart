@@ -144,6 +144,12 @@ class FakeController extends ValueNotifier<CameraValue>
 
   @override
   Stream<CameraDeviceTilts> get deviceTilts => Stream.fromIterable([]);
+
+  @override
+  Stream<String> get deviceLogError => Stream.fromIterable([]);
+
+  @override
+  Stream<String> get deviceLogInfo => Stream.fromIterable([]);
 }
 
 void main() {

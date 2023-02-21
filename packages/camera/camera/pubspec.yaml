@@ -25,7 +25,7 @@ dependencies:
     git:
       url: git@github.com:alien190/plugins.git
       path: packages/camera/camera_platform_interface
-      ref: 1e755295501a7d8056f52130ee88971eb0ce1656
+      ref: 1214a724b6b5e145b69c069d3b149fc5bdc666bd
 
   flutter:
     sdk: flutter

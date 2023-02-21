@@ -314,6 +314,14 @@ class CameraController extends ValueNotifier<CameraValue> {
         );
       });
 
+      _deviceLogErrorSubscription = CameraPlatform.instance
+          .onDeviceLogError()
+          .listen(_deviceLogErrorListener);
+
+      _deviceLogInfoSubscription = CameraPlatform.instance
+          .onDeviceLogInfo()
+          .listen(_deviceLogInfoListener);
+
       _cameraId = await CameraPlatform.instance.createCamera(
         description,
         resolutionPreset,
@@ -365,10 +373,6 @@ class CameraController extends ValueNotifier<CameraValue> {
 
       _deviceTiltsSubscription = CameraPlatform.instance
           .onDeviceTiltsChanged()
-          .listen(_deviceTiltsListener);
-
-      _deviceLogInfoSubject = CameraPlatform.instance
-          .onDevice
           .listen(_deviceTiltsListener);
     } on PlatformException catch (e) {
       throw CameraException(e.code, e.message);
