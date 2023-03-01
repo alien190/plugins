@@ -29,6 +29,8 @@ class CameraPreview extends StatelessWidget {
     this.normalVerticalTiltThreshold,
     this.overheadHorizontalTiltThreshold,
     this.overheadVerticalTiltThreshold,
+    this.isGridVisible = true,
+    this.isTiltsIndicatorVisible = true,
   });
 
   /// The controller for the camera that the preview is shown for.
@@ -49,6 +51,12 @@ class CameraPreview extends StatelessWidget {
   /// Vertical tilt threshold to show warning for overhead shot mode
   final int? overheadVerticalTiltThreshold;
 
+  /// Show or doesn't the grid overlay
+  final bool isGridVisible;
+
+  /// Show or doesn't the tilts indicator
+  final bool isTiltsIndicatorVisible;
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder(
@@ -65,17 +73,19 @@ class CameraPreview extends StatelessWidget {
                     _wrapPreviewInRotatedBox(
                       child: controller.buildPreview(),
                     ),
-                    CameraGrid(),
-                    CameraTilts(
-                      cameraController: controller,
-                      normalHorizontalTiltThreshold:
-                          normalHorizontalTiltThreshold,
-                      normalVerticalTiltThreshold: normalVerticalTiltThreshold,
-                      overheadHorizontalTiltThreshold:
-                          overheadHorizontalTiltThreshold,
-                      overheadVerticalTiltThreshold:
-                          overheadVerticalTiltThreshold,
-                    ),
+                    if (isGridVisible) CameraGrid(),
+                    if (isTiltsIndicatorVisible)
+                      CameraTilts(
+                        cameraController: controller,
+                        normalHorizontalTiltThreshold:
+                            normalHorizontalTiltThreshold,
+                        normalVerticalTiltThreshold:
+                            normalVerticalTiltThreshold,
+                        overheadHorizontalTiltThreshold:
+                            overheadHorizontalTiltThreshold,
+                        overheadVerticalTiltThreshold:
+                            overheadVerticalTiltThreshold,
+                      ),
                     if (controller.value.isTakingPicture)
                       CameraRotater(
                         child: CameraTakePictureAnimation(),

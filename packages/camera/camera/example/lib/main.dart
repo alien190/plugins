@@ -196,14 +196,15 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
         child: CameraPreview(
           controller!,
           child: LayoutBuilder(
-              builder: (BuildContext context, BoxConstraints constraints) {
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onScaleStart: _handleScaleStart,
-              onScaleUpdate: _handleScaleUpdate,
-              onTapDown: (details) => onViewFinderTap(details, constraints),
-            );
-          }),
+            builder: (BuildContext context, BoxConstraints constraints) {
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onScaleStart: _handleScaleStart,
+                onScaleUpdate: _handleScaleUpdate,
+                onTapDown: (details) => onViewFinderTap(details, constraints),
+              );
+            },
+          ),
         ),
       );
     }
@@ -675,8 +676,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
   String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
 
   void showInSnackBar(String message) {
-    // ignore: deprecated_member_use
-    _scaffoldKey.currentState?.showSnackBar(SnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(message),
       duration: Duration(
         seconds: 10,
