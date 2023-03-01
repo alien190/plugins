@@ -1509,8 +1509,15 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
                                   binaryMessenger:messenger];
         
         _imageStreamHandler = [[FLTImageStreamHandler alloc] init];
-        [eventChannel setStreamHandler:_imageStreamHandler];
         
+        if (!NSThread.isMainThread) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+              [eventChannel setStreamHandler:self->_imageStreamHandler];
+            });
+          } else {
+              [eventChannel setStreamHandler:_imageStreamHandler];
+          }
+                
         _isStreamingImages = YES;
     } else {
         [_methodChannel invokeMethod:errorMethod
