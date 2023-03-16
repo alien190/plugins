@@ -70,6 +70,11 @@ abstract class CameraPlatform extends PlatformInterface {
   Future<void> initializeCamera(
     int cameraId, {
     ImageFormatGroup imageFormatGroup = ImageFormatGroup.unknown,
+    bool isBarcodeStreamEnabled = false,
+    int cropLeftPercent = 0,
+    int cropRightPercent = 0,
+    int cropTopPercent = 0,
+    int cropBottomPercent = 0,
   }) {
     throw UnimplementedError('initializeCamera() is not implemented.');
   }

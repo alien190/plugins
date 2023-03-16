@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:camera/camera.dart';
+import 'package:camera/src/camera_barcode.dart';
 import 'package:camera/src/camera_device_tilts.dart';
 import 'package:camera_platform_interface/camera_platform_interface.dart';
 import 'package:flutter/foundation.dart';
@@ -40,6 +41,7 @@ class CameraValue {
     required this.isRecordingVideo,
     required this.isTakingPicture,
     required this.isStreamingImages,
+    required this.isStreamingBarcodes,
     required bool isRecordingPaused,
     required this.flashMode,
     required this.exposureMode,
@@ -68,6 +70,7 @@ class CameraValue {
           focusPointSupported: false,
           deviceOrientation: DeviceOrientation.portraitUp,
           isPreviewPaused: false,
+          isStreamingBarcodes: false,
         );
 
   /// True after [CameraController.initialize] has completed successfully.
@@ -81,6 +84,9 @@ class CameraValue {
 
   /// True when images from the camera are being streamed.
   final bool isStreamingImages;
+
+  /// True when barcodes from the camera are being streamed.
+  final bool isStreamingBarcodes;
 
   final bool _isRecordingPaused;
 
@@ -150,6 +156,7 @@ class CameraValue {
     bool? isRecordingVideo,
     bool? isTakingPicture,
     bool? isStreamingImages,
+    bool? isStreamingBarcodes,
     String? errorDescription,
     Size? previewSize,
     bool? isRecordingPaused,
@@ -189,6 +196,7 @@ class CameraValue {
       previewPauseOrientation: previewPauseOrientation == null
           ? this.previewPauseOrientation
           : previewPauseOrientation.orNull,
+      isStreamingBarcodes: isStreamingBarcodes ?? this.isStreamingBarcodes,
     );
   }
 
@@ -200,6 +208,7 @@ class CameraValue {
         'errorDescription: $errorDescription, '
         'previewSize: $previewSize, '
         'isStreamingImages: $isStreamingImages, '
+        'isStreamingBarcodes: $isStreamingBarcodes, '
         'flashMode: $flashMode, '
         'exposureMode: $exposureMode, '
         'focusMode: $focusMode, '
@@ -275,6 +284,13 @@ class CameraController extends ValueNotifier<CameraValue> {
   BehaviorSubject<String> _deviceLogErrorSubject = BehaviorSubject();
   BehaviorSubject<String> _deviceLogInfoSubject = BehaviorSubject();
 
+  /// barcodeStreamCompleter
+  final Completer<Stream<CameraBarcode>> _barcodeStreamCompleter = Completer();
+
+  /// barcodeStream
+  Future<Stream<CameraBarcode>> get barcodeStream =>
+      _barcodeStreamCompleter.future;
+
   /// Device tilts stream
   Stream<CameraDeviceTilts> get deviceTilts => _deviceTiltsSubject.stream;
 
@@ -297,7 +313,13 @@ class CameraController extends ValueNotifier<CameraValue> {
   /// Initializes the camera on the device.
   ///
   /// Throws a [CameraException] if the initialization fails.
-  Future<void> initialize() async {
+  Future<void> initialize({
+    bool isBarcodeStreamEnabled = false,
+    int cropLeftPercent = 0,
+    int cropRightPercent = 0,
+    int cropTopPercent = 0,
+    int cropBottomPercent = 0,
+  }) async {
     if (_isDisposed) {
       throw CameraException(
         'Disposed CameraController',
@@ -340,6 +362,11 @@ class CameraController extends ValueNotifier<CameraValue> {
       await CameraPlatform.instance.initializeCamera(
         _cameraId,
         imageFormatGroup: imageFormatGroup ?? ImageFormatGroup.unknown,
+        isBarcodeStreamEnabled: isBarcodeStreamEnabled,
+        cropLeftPercent: cropLeftPercent,
+        cropBottomPercent: cropBottomPercent,
+        cropRightPercent: cropRightPercent,
+        cropTopPercent: cropTopPercent,
       );
 
       value = value.copyWith(
@@ -357,6 +384,7 @@ class CameraController extends ValueNotifier<CameraValue> {
             .then((event) => event.exposurePointSupported),
         focusPointSupported: await _initializeCompleter.future
             .then((event) => event.focusPointSupported),
+        isStreamingBarcodes: isBarcodeStreamEnabled,
       );
 
       _cameraClosingSubscription =
@@ -374,11 +402,29 @@ class CameraController extends ValueNotifier<CameraValue> {
       _deviceTiltsSubscription = CameraPlatform.instance
           .onDeviceTiltsChanged()
           .listen(_deviceTiltsListener);
+
+      final barcodeStream =
+          EventChannel('plugins.flutter.io/camera/barcodeStream')
+              .receiveBroadcastStream()
+              .map(_toCameraBarcode);
+      _barcodeStreamCompleter.complete(barcodeStream);
     } on PlatformException catch (e) {
       throw CameraException(e.code, e.message);
     }
 
     _initCalled = true;
+  }
+
+  CameraBarcode _toCameraBarcode(dynamic event) {
+    try {
+      return CameraBarcode.fromJson(event);
+    } catch (error) {
+      return CameraBarcode(
+        text: '',
+        format: '',
+        errorDescription: error.toString(),
+      );
+    }
   }
 
   void _setCameraIsNotInit(String errorDescription) {
@@ -508,8 +554,7 @@ class CameraController extends ValueNotifier<CameraValue> {
   ///
   // TODO(bmparr): Add settings for resolution and fps.
   Future<void> startImageStream(onLatestImageAvailable onAvailable) async {
-    assert(defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS);
+    assert(defaultTargetPlatform == TargetPlatform.iOS);
     _throwIfNotInitialized("startImageStream");
     if (value.isRecordingVideo) {
       throw CameraException(
@@ -573,6 +618,31 @@ class CameraController extends ValueNotifier<CameraValue> {
 
     await _imageStreamSubscription?.cancel();
     _imageStreamSubscription = null;
+  }
+
+  /// Stop streaming barcodes from platform camera.
+  Future<void> stopBarcodeStream() async {
+    assert(defaultTargetPlatform == TargetPlatform.android);
+    _throwIfNotInitialized("stopBarcodeStream");
+    if (value.isRecordingVideo) {
+      throw CameraException(
+        'A video recording is already started.',
+        'stopBarcodeStream was called while a video is being recorded.',
+      );
+    }
+    if (!value.isStreamingBarcodes) {
+      throw CameraException(
+        'No camera is streaming barcodes',
+        'stopImageStream was called when no camera is streaming images.',
+      );
+    }
+
+    try {
+      value = value.copyWith(isStreamingBarcodes: false);
+      await _channel.invokeMethod<void>('stopBarcodeStream');
+    } on PlatformException catch (e) {
+      throw CameraException(e.code, e.message);
+    }
   }
 
   /// Start a video recording.

@@ -9,6 +9,7 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.ImageFormat;
+import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -40,6 +41,14 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
+import com.google.zxing.Binarizer;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.LuminanceSource;
+import com.google.zxing.MultiFormatReader;
+import com.google.zxing.NotFoundException;
+import com.google.zxing.PlanarYUVLuminanceSource;
+import com.google.zxing.common.GlobalHistogramBinarizer;
+
 import io.flutter.embedding.engine.systemchannels.PlatformChannel;
 import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.MethodChannel;
@@ -63,8 +72,11 @@ import io.flutter.plugins.camera.features.sensororientation.DeviceOrientationMan
 import io.flutter.plugins.camera.features.sensororientation.SensorOrientationFeature;
 import io.flutter.plugins.camera.features.zoomlevel.ZoomLevelFeature;
 import io.flutter.plugins.camera.media.MediaRecorderBuilder;
+import io.flutter.plugins.camera.types.BarcodeCaptureSettings;
+import io.flutter.plugins.camera.types.CameraBarcode;
 import io.flutter.plugins.camera.types.CameraCaptureProperties;
 import io.flutter.plugins.camera.types.CaptureTimeoutsWrapper;
+import io.flutter.plugins.camera.types.ImageBytes;
 import io.flutter.plugins.camera.types.TakePictureResult;
 import io.flutter.view.TextureRegistry.SurfaceTextureEntry;
 
@@ -76,7 +88,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.concurrent.Executors;
 
 @FunctionalInterface
@@ -121,10 +132,14 @@ class Camera
      */
     private Handler backgroundHandler;
 
+    private Handler barcodeBackgroundHandler;
+
     /**
      * An additional thread for running tasks that shouldn't block the UI.
      */
     private HandlerThread backgroundHandlerThread;
+
+    private HandlerThread barcodeBackgroundHandlerThread;
 
     private CameraDevice cameraDevice;
     private CameraCaptureSession captureSession;
@@ -157,6 +172,10 @@ class Camera
     private CameraCaptureProperties captureProps;
 
     private MethodChannel.Result flutterResult;
+
+    private Boolean nextImageIsRequestedToBarcodeScan;
+
+    private EventChannel.EventSink barcodeStreamSink;
 
     public Camera(
             final Activity activity,
@@ -192,8 +211,10 @@ class Camera
         captureTimeouts = new CaptureTimeoutsWrapper(3000, 3000);
         captureProps = new CameraCaptureProperties();
         cameraCaptureCallback = CameraCaptureCallback.create(this, captureTimeouts, captureProps);
+        nextImageIsRequestedToBarcodeScan = false;
 
         startBackgroundThread();
+        startBarcodeBackgroundThread();
     }
 
     @Override
@@ -243,7 +264,10 @@ class Camera
     }
 
     @SuppressLint("MissingPermission")
-    public void open(String imageFormatGroup) throws CameraAccessException {
+    public void open(String imageFormatGroup,
+                     BarcodeCaptureSettings barcodeCaptureSettings,
+                     EventChannel barcodeEventChannel
+    ) throws CameraAccessException {
         final ResolutionFeature resolutionFeature = cameraFeatures.getResolution();
 
         if (!resolutionFeature.checkIsSupported()) {
@@ -265,12 +289,6 @@ class Camera
                         resolutionFeature.getCaptureFormat(),
                         1);
 
-        // For image streaming, use the provided image format or fall back to YUV420.
-//        Integer imageFormat = supportedImageFormats.get(imageFormatGroup);
-//        if (imageFormat == null) {
-//            Log.w(TAG, "The selected imageFormatGroup is not supported by Android. Defaulting to yuv420");
-//            imageFormat = ImageFormat.YUV_420_888;
-//        }
         imageStreamReader =
                 ImageReader.newInstance(
                         resolutionFeature.getPreviewSize().getWidth(),
@@ -287,7 +305,14 @@ class Camera
                     public void onOpened(@NonNull CameraDevice device) {
                         cameraDevice = device;
                         try {
-                            startPreview();
+                            if (barcodeCaptureSettings != null && barcodeEventChannel != null) {
+                                startPreviewWithBarcodeStream(
+                                        barcodeCaptureSettings,
+                                        barcodeEventChannel
+                                );
+                            } else {
+                                startPreview();
+                            }
                             dartMessenger.sendCameraInitializedEvent(
                                     resolutionFeature.getPreviewSize().getWidth(),
                                     resolutionFeature.getPreviewSize().getHeight(),
@@ -352,12 +377,18 @@ class Camera
 
     private void createCaptureSession(int templateType, Surface... surfaces)
             throws CameraAccessException {
-        createCaptureSession(templateType, null, surfaces);
+        createCaptureSession(
+                templateType,
+                () -> Log.d(TAG, "Capture session was created successfully"),
+                surfaces
+        );
     }
 
     private void createCaptureSession(
-            int templateType, Runnable onSuccessCallback, Surface... surfaces)
-            throws CameraAccessException {
+            int templateType,
+            Runnable onSuccessCallback,
+            Surface... surfaces
+    ) throws CameraAccessException {
         // Close any existing capture session.
         closeCaptureSession();
 
@@ -406,7 +437,9 @@ class Camera
                         updateBuilderSettings(previewRequestBuilder);
 
                         refreshPreviewCaptureSession(
-                                onSuccessCallback, (code, message) -> dartMessenger.sendCameraErrorEvent(message));
+                                onSuccessCallback,
+                                (code, message) -> dartMessenger.sendCameraErrorEvent(message)
+                        );
                     }
 
                     @Override
@@ -462,7 +495,9 @@ class Camera
 
     // Send a repeating request to refresh  capture session.
     private void refreshPreviewCaptureSession(
-            @Nullable Runnable onSuccessCallback, @NonNull ErrorCallback onErrorCallback) {
+            @Nullable Runnable onSuccessCallback,
+            @NonNull ErrorCallback onErrorCallback
+    ) {
         Log.i(TAG, "refreshPreviewCaptureSession");
 
         if (captureSession == null) {
@@ -477,7 +512,10 @@ class Camera
         try {
             if (!pausedPreview) {
                 captureSession.setRepeatingRequest(
-                        previewRequestBuilder.build(), cameraCaptureCallback, backgroundHandler);
+                        previewRequestBuilder.build(),
+                        cameraCaptureCallback,
+                        backgroundHandler
+                );
             }
 
             if (onSuccessCallback != null) {
@@ -669,21 +707,39 @@ class Camera
         backgroundHandler = HandlerFactory.create(backgroundHandlerThread.getLooper());
     }
 
+    public void startBarcodeBackgroundThread() {
+        if (barcodeBackgroundHandlerThread != null) {
+            return;
+        }
+
+        barcodeBackgroundHandlerThread = HandlerThreadFactory.create("BarcodeBackground");
+        try {
+            barcodeBackgroundHandlerThread.start();
+        } catch (Exception e) {
+            // Ignore exception in case the thread has already started.
+        }
+        barcodeBackgroundHandler = HandlerFactory.create(barcodeBackgroundHandlerThread.getLooper());
+    }
+
     /**
      * Stops the background thread and its {@link Handler}.
      */
     public void stopBackgroundThread() {
         if (backgroundHandlerThread != null) {
             backgroundHandlerThread.quit();
-//            try {
-//                backgroundHandlerThread.join();
-//            } catch (Exception e) {
-//                dartMessenger.error(flutterResult, "cameraAccess", e.getMessage(), null);
-//            }
         }
         backgroundHandlerThread = null;
         backgroundHandler = null;
     }
+
+    public void stopBarcodeBackgroundThread() {
+        if (barcodeBackgroundHandlerThread != null) {
+            barcodeBackgroundHandlerThread.quit();
+        }
+        barcodeBackgroundHandlerThread = null;
+        barcodeBackgroundHandler = null;
+    }
+
 
     /**
      * Start capturing a picture, doing autofocus first.
@@ -1096,21 +1152,27 @@ class Camera
         createCaptureSession(CameraDevice.TEMPLATE_PREVIEW, pictureImageReader.getSurface());
     }
 
-    public void startPreviewWithImageStream(EventChannel imageStreamChannel)
-            throws CameraAccessException {
-        createCaptureSession(CameraDevice.TEMPLATE_RECORD, imageStreamReader.getSurface());
-        Log.i(TAG, "startPreviewWithImageStream");
+    public void startPreviewWithBarcodeStream(BarcodeCaptureSettings settings,
+                                              EventChannel barcodeEventChannel
+    ) throws CameraAccessException {
+        setBarcodeStreamAvailableListener(settings);
 
-        imageStreamChannel.setStreamHandler(
+        createCaptureSession(CameraDevice.TEMPLATE_RECORD, imageStreamReader.getSurface());
+        Log.i(TAG, "startPreviewWithBarcodeStream");
+
+        barcodeEventChannel.setStreamHandler(
                 new EventChannel.StreamHandler() {
                     @Override
-                    public void onListen(Object o, EventChannel.EventSink imageStreamSink) {
-                        setImageStreamImageAvailableListener(imageStreamSink);
+                    public void onListen(Object o, EventChannel.EventSink barcodeStreamSink) {
+                        Camera.this.barcodeStreamSink = barcodeStreamSink;
+                        nextImageIsRequestedToBarcodeScan = true;
                     }
 
                     @Override
                     public void onCancel(Object o) {
                         imageStreamReader.setOnImageAvailableListener(null, backgroundHandler);
+                        nextImageIsRequestedToBarcodeScan = false;
+                        Camera.this.barcodeStreamSink = null;
                     }
                 });
     }
@@ -1149,44 +1211,267 @@ class Camera
         cameraCaptureCallback.setCameraState(CameraState.STATE_PREVIEW);
     }
 
-    private void setImageStreamImageAvailableListener(final EventChannel.EventSink imageStreamSink) {
+    private void setBarcodeStreamAvailableListener(BarcodeCaptureSettings settings) {
+        final MultiFormatReader barcodeReader = new MultiFormatReader();
+
         imageStreamReader.setOnImageAvailableListener(
                 reader -> {
                     Image img = reader.acquireNextImage();
                     // Use acquireNextImage since image reader is only for one image.
                     if (img == null) return;
 
-                    List<Map<String, Object>> planes = new ArrayList<>();
-                    for (Image.Plane plane : img.getPlanes()) {
-                        ByteBuffer buffer = plane.getBuffer();
-
-                        byte[] bytes = new byte[buffer.remaining()];
-                        buffer.get(bytes, 0, bytes.length);
-
-                        Map<String, Object> planeBuffer = new HashMap<>();
-                        planeBuffer.put("bytesPerRow", plane.getRowStride());
-                        planeBuffer.put("bytesPerPixel", plane.getPixelStride());
-                        planeBuffer.put("bytes", bytes);
-
-                        planes.add(planeBuffer);
+                    if (!nextImageIsRequestedToBarcodeScan || barcodeStreamSink == null) {
+                        img.close();
+                        return;
                     }
 
-                    Map<String, Object> imageBuffer = new HashMap<>();
-                    imageBuffer.put("width", img.getWidth());
-                    imageBuffer.put("height", img.getHeight());
-                    imageBuffer.put("format", img.getFormat());
-                    imageBuffer.put("planes", planes);
-                    imageBuffer.put("lensAperture", this.captureProps.getLastLensAperture());
-                    imageBuffer.put("sensorExposureTime", this.captureProps.getLastSensorExposureTime());
-                    Integer sensorSensitivity = this.captureProps.getLastSensorSensitivity();
-                    imageBuffer.put(
-                            "sensorSensitivity", sensorSensitivity == null ? null : (double) sensorSensitivity);
+                    nextImageIsRequestedToBarcodeScan = false;
 
-                    final Handler handler = new Handler(Looper.getMainLooper());
-                    handler.post(() -> imageStreamSink.success(imageBuffer));
+                    final ImageBytes bytes = removeStridesFromImage(img);
                     img.close();
+
+                    barcodeBackgroundHandler.post(() -> {
+                        try {
+                            final int targetImageRotation = getTargetImageRotation();
+                            ImageBytes downscaledBytes = rotateImageBytes(bytes, targetImageRotation);
+                            downscaledBytes = cropImageBytes(
+                                    downscaledBytes,
+                                    settings.cropLeft,
+                                    settings.cropRight,
+                                    settings.cropTop,
+                                    settings.cropBottom
+                            );
+
+                            for (int step = 0; step < 4; step++) {
+                                final LuminanceSource luminanceSource =
+                                        new PlanarYUVLuminanceSource(
+                                                downscaledBytes.getBytes(),
+                                                downscaledBytes.getWidth(),
+                                                downscaledBytes.getHeight(),
+                                                0,
+                                                0,
+                                                downscaledBytes.getWidth(),
+                                                downscaledBytes.getHeight(),
+                                                false
+                                        );
+
+
+                                final Binarizer binarizer = new GlobalHistogramBinarizer(luminanceSource);
+                                final BinaryBitmap binaryBitmap = new BinaryBitmap(binarizer);
+
+                                try {
+                                    final com.google.zxing.Result decodeResult = barcodeReader.decodeWithState(binaryBitmap);
+                                    final CameraBarcode cameraBarcode = new CameraBarcode(
+                                            decodeResult.getText(),
+                                            decodeResult.getBarcodeFormat().toString(),
+                                            null);
+
+
+                                    sendCameraBarcodeEvent(cameraBarcode);
+
+                                    Log.d(TAG, "Decode step: " + step);
+                                    Log.d(TAG, decodeResult.getBarcodeFormat().toString());
+                                    Log.d(TAG, decodeResult.getText());
+                                    break;
+                                } catch (NotFoundException notFoundException) {
+                                    downscaledBytes = downscaleImageBytes(downscaledBytes);
+                                }
+                            }
+                        } catch (Exception exception) {
+                            Log.e(TAG, "Barcode exception", exception);
+                            final CameraBarcode cameraBarcode = new CameraBarcode(
+                                    null,
+                                    null,
+                                    exception.toString());
+                            sendCameraBarcodeEvent(cameraBarcode);
+                        }
+                        nextImageIsRequestedToBarcodeScan = true;
+                    });
                 },
                 backgroundHandler);
+    }
+
+    private void sendCameraBarcodeEvent(final CameraBarcode cameraBarcode) {
+        final Handler handler = new Handler(Looper.getMainLooper());
+        handler.post(() -> {
+            if (barcodeStreamSink != null) {
+                barcodeStreamSink.success(cameraBarcode.getMap());
+            }
+        });
+    }
+
+    private int getTargetImageRotation() {
+        final SensorOrientationFeature sensorOrientation = cameraFeatures.getSensorOrientation();
+        final DeviceOrientationManager deviceOrientationManager = sensorOrientation
+                .getDeviceOrientationManager();
+        final io.flutter.plugins.camera.types.DeviceTilts deviceTilts = deviceOrientationManager
+                .getDeviceTilts();
+
+        final Integer sensorOrientationAngle = sensorOrientation.getValue();
+        final int sensorAngle = sensorOrientationAngle != null ? sensorOrientationAngle : 0;
+
+        if (deviceTilts.lockedCaptureAngle == -1) {
+            return (int) deviceTilts.targetImageRotation + sensorAngle;
+        } else {
+            return deviceOrientationManager.getUIOrientationAngle()
+                    + deviceTilts.lockedCaptureAngle
+                    + sensorAngle;
+        }
+    }
+
+    private ImageBytes downscaleImageBytes(ImageBytes srcImageBytes) {
+        final int srcWidth = srcImageBytes.getWidth();
+        final int dstWidth = srcWidth / 2;
+        final int dstHeight = srcImageBytes.getHeight() / 2;
+        final byte[] srcBytes = srcImageBytes.getBytes();
+
+        byte[] dstBytes = new byte[dstWidth * dstHeight];
+
+        for (int rowIndex = 0; rowIndex < dstHeight; rowIndex++) {
+            for (int colIndex = 0; colIndex < dstWidth; colIndex++) {
+                final int byte00 = srcBytes[rowIndex * srcWidth * 2 + colIndex * 2];
+                final int byte01 = srcBytes[rowIndex * srcWidth * 2 + colIndex * 2 + 1];
+                final int byte10 = srcBytes[(rowIndex * 2 + 1) * srcWidth + colIndex * 2];
+                final int byte11 = srcBytes[(rowIndex * 2 + 1) * srcWidth + colIndex * 2 + 1];
+
+                final byte dstByte = (byte) Math.min(Math.min(byte00, byte01), Math.min(byte10, byte11));
+
+                dstBytes[rowIndex * dstWidth + colIndex] = dstByte;
+            }
+        }
+        return new ImageBytes(dstWidth, dstHeight, dstBytes);
+    }
+
+    private ImageBytes rotateImageBytes(ImageBytes srcBytes, int angle) {
+        switch (angle) {
+            case 90:
+            case -270:
+                return rotateImageBytes90(srcBytes, true);
+            case 180:
+            case -180:
+                return rotateImageBytes180(srcBytes);
+            case -90:
+            case 270:
+                return rotateImageBytes90(srcBytes, false);
+            default:
+                return srcBytes;
+        }
+    }
+
+    private ImageBytes rotateImageBytes90(ImageBytes srcImageBytes, boolean isClockWise) {
+        final int srcHeight = srcImageBytes.getHeight();
+        final int srcWidth = srcImageBytes.getWidth();
+        final byte[] srcBytes = srcImageBytes.getBytes();
+        final byte[] dstBytes = new byte[srcBytes.length];
+
+        for (int srcRowIndex = 0; srcRowIndex < srcHeight; srcRowIndex++) {
+            for (int srcColIndex = 0; srcColIndex < srcWidth; srcColIndex++) {
+                final byte curByte = srcBytes[srcRowIndex * srcWidth + srcColIndex];
+                if (isClockWise) {
+                    dstBytes[srcHeight - srcRowIndex - 1 + srcColIndex * srcHeight] = curByte;
+                } else {
+                    dstBytes[srcRowIndex + (srcWidth - srcColIndex - 1) * srcHeight] = curByte;
+                }
+            }
+        }
+        return new ImageBytes(srcHeight, srcWidth, dstBytes);
+    }
+
+    private ImageBytes rotateImageBytes180(ImageBytes srcImageBytes) {
+        final int srcHeight = srcImageBytes.getHeight();
+        final int srcWidth = srcImageBytes.getWidth();
+        final byte[] srcBytes = srcImageBytes.getBytes();
+        final byte[] dstBytes = new byte[srcBytes.length];
+
+        for (int srcRowIndex = 0; srcRowIndex < srcHeight; srcRowIndex++) {
+            for (int srcColIndex = 0; srcColIndex < srcWidth; srcColIndex++) {
+                final byte curByte = srcBytes[srcRowIndex * srcWidth + srcColIndex];
+                dstBytes[(srcHeight - srcRowIndex) * srcWidth - srcColIndex - 1] = curByte;
+            }
+        }
+        return new ImageBytes(srcWidth, srcHeight, dstBytes);
+    }
+
+    private ImageBytes removeStridesFromImage(Image image) {
+        Rect crop = image.getCropRect();
+        int width = crop.width();
+        int height = crop.height();
+        Image.Plane[] planes = image.getPlanes();
+        byte[] data = new byte[width * height];
+        byte[] rowData = new byte[planes[0].getRowStride()];
+
+        int channelOffset = 0;
+        int outputStride = 1;
+
+        ByteBuffer buffer = planes[0].getBuffer();
+        int rowStride = planes[0].getRowStride();
+        int pixelStride = planes[0].getPixelStride();
+
+        int shift = 0;
+        int w = width >> shift;
+        int h = height >> shift;
+        buffer.position(rowStride * (crop.top >> shift) + pixelStride * (crop.left >> shift));
+        for (int row = 0; row < h; row++) {
+            int length;
+            if (pixelStride == 1) {
+                length = w;
+                buffer.get(data, channelOffset, length);
+                channelOffset += length;
+            } else {
+                length = (w - 1) * pixelStride + 1;
+                buffer.get(rowData, 0, length);
+                for (int col = 0; col < w; col++) {
+                    data[channelOffset] = rowData[col * pixelStride];
+                    channelOffset += outputStride;
+                }
+            }
+            if (row < h - 1) {
+                buffer.position(buffer.position() + rowStride - length);
+            }
+        }
+        return new ImageBytes(width, height, data);
+    }
+
+    private ImageBytes cropImageBytes(ImageBytes srcImageBytes,
+                                      int left,
+                                      int right,
+                                      int top,
+                                      int bottom) {
+        int leftOffset = 0;
+        int rightOffset = 0;
+        int topOffset = 0;
+        int bottomOffset = 0;
+
+        if (left > 0 && right > 0 && left + right < 100) {
+            leftOffset = srcImageBytes.getWidth() * left / 100;
+            rightOffset = srcImageBytes.getWidth() * right / 100;
+        }
+
+        if (top > 0 && bottom > 0 && top + bottom < 100) {
+            topOffset = srcImageBytes.getHeight() * top / 100;
+            bottomOffset = srcImageBytes.getHeight() * bottom / 100;
+        }
+
+
+        final int srcWidth = srcImageBytes.getWidth();
+        final int srcHeight = srcImageBytes.getHeight();
+
+        final int dstWidth = srcWidth - leftOffset - rightOffset;
+        final int dstHeight = srcHeight - topOffset - bottomOffset;
+
+        final byte[] srcBytes = srcImageBytes.getBytes();
+        final byte[] dstBytes = new byte[dstWidth * dstHeight];
+
+        for (int rowIndex = topOffset; rowIndex < topOffset + dstHeight; rowIndex++) {
+            System.arraycopy(
+                    srcBytes,
+                    rowIndex * srcWidth + leftOffset,
+                    dstBytes,
+                    (rowIndex - topOffset) * dstWidth,
+                    dstWidth
+            );
+        }
+        return new ImageBytes(dstWidth, dstHeight, dstBytes);
     }
 
     private void closeCaptureSession() {
@@ -1221,6 +1506,7 @@ class Camera
         }
 
         stopBackgroundThread();
+        stopBarcodeBackgroundThread();
     }
 
     public void dispose() {

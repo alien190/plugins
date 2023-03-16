@@ -730,7 +730,22 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     });
 
     try {
-      await cameraController.initialize();
+      cameraController.barcodeStream
+          .then(
+            (stream) => stream.listen(
+              (event) {
+                print('Barcode event: $event');
+              },
+            ),
+          )
+          .ignore();
+
+      await cameraController.initialize(
+        isBarcodeStreamEnabled: true,
+        cropTopPercent: 30,
+        cropBottomPercent: 30,
+      );
+
       await Future.wait([
         // The exposure mode is currently not supported on the web.
         ...(!kIsWeb

@@ -64,6 +64,10 @@ public class DeviceOrientationManager implements SensorEventListener {
     private int lockedCaptureAngle = -1;
     private int deviceOrientationAngle = 0;
 
+    public int getUIOrientationAngle() {
+        return getOrientationAngle(uiOrientation);
+    }
+
     /**
      * Factory method to create a device orientation manager.
      */

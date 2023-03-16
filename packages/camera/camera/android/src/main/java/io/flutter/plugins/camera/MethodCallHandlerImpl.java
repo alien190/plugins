@@ -25,6 +25,7 @@ import io.flutter.plugins.camera.features.autofocus.FocusMode;
 import io.flutter.plugins.camera.features.exposurelock.ExposureMode;
 import io.flutter.plugins.camera.features.flash.FlashMode;
 import io.flutter.plugins.camera.features.resolution.ResolutionPreset;
+import io.flutter.plugins.camera.types.BarcodeCaptureSettings;
 import io.flutter.view.TextureRegistry;
 
 import java.util.HashMap;
@@ -37,7 +38,7 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
     private final PermissionsRegistry permissionsRegistry;
     private final TextureRegistry textureRegistry;
     private final MethodChannel methodChannel;
-    private final EventChannel imageStreamChannel;
+    private final EventChannel barcodeStreamChannel;
     private @Nullable
     Camera camera;
 
@@ -54,7 +55,7 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
         this.textureRegistry = textureRegistry;
 
         methodChannel = new MethodChannel(messenger, "plugins.flutter.io/camera");
-        imageStreamChannel = new EventChannel(messenger, "plugins.flutter.io/camera/imageStream");
+        barcodeStreamChannel = new EventChannel(messenger, "plugins.flutter.io/camera/barcodeStream");
         methodChannel.setMethodCallHandler(this);
     }
 
@@ -93,7 +94,28 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
             case "initialize": {
                 if (camera != null) {
                     try {
-                        camera.open(call.argument("imageFormatGroup"));
+                        final Boolean isBarcodeStreamEnabled = call.argument("isBarcodeStreamEnabled");
+                        if (isBarcodeStreamEnabled != null && isBarcodeStreamEnabled) {
+                            Integer cropLeft = call.argument("cropLeft");
+                            Integer cropRight = call.argument("cropRight");
+                            Integer cropTop = call.argument("cropTop");
+                            Integer cropBottom = call.argument("cropBottom");
+
+                            if (cropLeft == null) cropLeft = 0;
+                            if (cropRight == null) cropRight = 0;
+                            if (cropTop == null) cropTop = 0;
+                            if (cropBottom == null) cropBottom = 0;
+
+                            final BarcodeCaptureSettings settings = new BarcodeCaptureSettings(
+                                    cropLeft,
+                                    cropRight,
+                                    cropTop,
+                                    cropBottom
+                            );
+                            camera.open(call.argument("imageFormatGroup"), settings, barcodeStreamChannel);
+                        } else {
+                            camera.open(call.argument("imageFormatGroup"), null, null);
+                        }
                         result.success(null);
                     } catch (Exception e) {
                         handleException(e, result);
@@ -235,16 +257,7 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
                 }
                 break;
             }
-            case "startImageStream": {
-                try {
-                    camera.startPreviewWithImageStream(imageStreamChannel);
-                    result.success(null);
-                } catch (Exception e) {
-                    handleException(e, result);
-                }
-                break;
-            }
-            case "stopImageStream": {
+            case "stopBarcodeStream": {
                 try {
                     camera.startPreview();
                     result.success(null);

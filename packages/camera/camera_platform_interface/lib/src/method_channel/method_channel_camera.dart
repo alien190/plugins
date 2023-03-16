@@ -108,6 +108,11 @@ class MethodChannelCamera extends CameraPlatform {
   Future<void> initializeCamera(
     int cameraId, {
     ImageFormatGroup imageFormatGroup = ImageFormatGroup.unknown,
+    bool isBarcodeStreamEnabled = false,
+    int cropLeftPercent = 0,
+    int cropRightPercent = 0,
+    int cropTopPercent = 0,
+    int cropBottomPercent = 0,
   }) {
     _channels.putIfAbsent(cameraId, () {
       final channel = MethodChannel('flutter.io/cameraPlugin/camera$cameraId');
@@ -126,7 +131,12 @@ class MethodChannelCamera extends CameraPlatform {
       'initialize',
       <String, dynamic>{
         'cameraId': cameraId,
+        'isBarcodeStreamEnabled': isBarcodeStreamEnabled,
         'imageFormatGroup': imageFormatGroup.name(),
+        'cropLeft': cropLeftPercent,
+        'cropRight': cropRightPercent,
+        'cropTop': cropTopPercent,
+        'cropBottom': cropBottomPercent,
       },
     );
 

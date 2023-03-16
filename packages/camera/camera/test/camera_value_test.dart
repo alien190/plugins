@@ -31,6 +31,7 @@ void main() {
         focusPointSupported: true,
         isPreviewPaused: false,
         previewPauseOrientation: DeviceOrientation.portraitUp,
+        isStreamingBarcodes: false,
       );
 
       expect(cameraValue, isA<CameraValue>());
@@ -125,23 +126,25 @@ void main() {
 
     test('toString() works as expected', () {
       var cameraValue = const CameraValue(
-          isInitialized: false,
-          errorDescription: null,
-          previewSize: Size(10, 10),
-          isRecordingPaused: false,
-          isRecordingVideo: false,
-          isTakingPicture: false,
-          isStreamingImages: false,
-          flashMode: FlashMode.auto,
-          exposureMode: ExposureMode.auto,
-          focusMode: FocusMode.auto,
-          exposurePointSupported: true,
-          focusPointSupported: true,
-          deviceOrientation: DeviceOrientation.portraitUp,
-          lockedCaptureOrientation: DeviceOrientation.portraitUp,
-          recordingOrientation: DeviceOrientation.portraitUp,
-          isPreviewPaused: true,
-          previewPauseOrientation: DeviceOrientation.portraitUp);
+        isInitialized: false,
+        errorDescription: null,
+        previewSize: Size(10, 10),
+        isRecordingPaused: false,
+        isRecordingVideo: false,
+        isTakingPicture: false,
+        isStreamingImages: false,
+        flashMode: FlashMode.auto,
+        exposureMode: ExposureMode.auto,
+        focusMode: FocusMode.auto,
+        exposurePointSupported: true,
+        focusPointSupported: true,
+        deviceOrientation: DeviceOrientation.portraitUp,
+        lockedCaptureOrientation: DeviceOrientation.portraitUp,
+        recordingOrientation: DeviceOrientation.portraitUp,
+        isPreviewPaused: true,
+        previewPauseOrientation: DeviceOrientation.portraitUp,
+        isStreamingBarcodes: false,
+      );
 
       expect(cameraValue.toString(),
           'CameraValue(isRecordingVideo: false, isInitialized: false, errorDescription: null, previewSize: Size(10.0, 10.0), isStreamingImages: false, flashMode: FlashMode.auto, exposureMode: ExposureMode.auto, focusMode: FocusMode.auto, exposurePointSupported: true, focusPointSupported: true, deviceOrientation: DeviceOrientation.portraitUp, lockedCaptureOrientation: DeviceOrientation.portraitUp, recordingOrientation: DeviceOrientation.portraitUp, isPreviewPaused: true, previewPausedOrientation: DeviceOrientation.portraitUp)');

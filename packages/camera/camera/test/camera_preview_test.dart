@@ -5,6 +5,7 @@
 import 'dart:async';
 
 import 'package:camera/camera.dart';
+import 'package:camera/src/camera_barcode.dart';
 import 'package:camera/src/camera_device_tilts.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -57,9 +58,6 @@ class FakeController extends ValueNotifier<CameraValue>
 
   @override
   ImageFormatGroup? get imageFormatGroup => null;
-
-  @override
-  Future<void> initialize() async {}
 
   @override
   Future<void> lockCaptureOrientation([DeviceOrientation? orientation]) async {}
@@ -150,6 +148,32 @@ class FakeController extends ValueNotifier<CameraValue>
 
   @override
   Stream<String> get deviceLogInfo => Stream.fromIterable([]);
+
+  @override
+  Future<Stream<CameraBarcode>> startBarcodeStream(
+          {int cropLeftPercent = 0,
+          int cropRightPercent = 0,
+          int cropTopPercent = 0,
+          int cropBottomPercent = 0}) =>
+      Future.value(Stream.fromIterable([]));
+
+  @override
+  Future<void> stopBarcodeStream() async {}
+
+  @override
+  Stream<CameraBarcode> get cameraBarcodesStream => Stream.fromIterable([]);
+
+  @override
+  Future<void> initialize(
+      {bool isBarcodeStreamEnabled = false,
+      int cropLeftPercent = 0,
+      int cropRightPercent = 0,
+      int cropTopPercent = 0,
+      int cropBottomPercent = 0}) async {}
+
+  @override
+  Future<Stream<CameraBarcode>> get barcodeStream =>
+      Future.value(Stream.fromIterable([]));
 }
 
 void main() {

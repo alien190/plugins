@@ -1385,6 +1385,11 @@ class MockCameraPlatform extends Mock
   Future<void> initializeCamera(
     int? cameraId, {
     ImageFormatGroup? imageFormatGroup = ImageFormatGroup.unknown,
+    bool isBarcodeStreamEnabled = false,
+    int cropLeftPercent = 0,
+    int cropRightPercent = 0,
+    int cropTopPercent = 0,
+    int cropBottomPercent = 0,
   }) async =>
       super.noSuchMethod(Invocation.method(
         #initializeCamera,
