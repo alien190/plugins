@@ -1390,6 +1390,7 @@ class MockCameraPlatform extends Mock
     int cropRightPercent = 0,
     int cropTopPercent = 0,
     int cropBottomPercent = 0,
+    int barcodeStreamId = 0,
   }) async =>
       super.noSuchMethod(Invocation.method(
         #initializeCamera,
