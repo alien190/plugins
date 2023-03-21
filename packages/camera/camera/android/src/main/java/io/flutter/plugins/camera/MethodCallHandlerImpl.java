@@ -98,13 +98,13 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
                             Integer cropRight = call.argument("cropRight");
                             Integer cropTop = call.argument("cropTop");
                             Integer cropBottom = call.argument("cropBottom");
-                            Integer streamId = call.argument("barcodeStreamId");
+                            Long streamId = call.argument("barcodeStreamId");
 
                             if (cropLeft == null) cropLeft = 0;
                             if (cropRight == null) cropRight = 0;
                             if (cropTop == null) cropTop = 0;
                             if (cropBottom == null) cropBottom = 0;
-                            if (streamId == null) streamId = 0;
+                            if (streamId == null) streamId = 0L;
 
                             final BarcodeCaptureSettings settings = new BarcodeCaptureSettings(
                                     cropLeft,
