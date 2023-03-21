@@ -75,6 +75,7 @@ abstract class CameraPlatform extends PlatformInterface {
     int cropRightPercent = 0,
     int cropTopPercent = 0,
     int cropBottomPercent = 0,
+    int barcodeStreamId = 0,
   }) {
     throw UnimplementedError('initializeCamera() is not implemented.');
   }

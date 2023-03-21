@@ -359,6 +359,8 @@ class CameraController extends ValueNotifier<CameraValue> {
         _initializeCompleter.complete(event);
       }));
 
+      final barcodeStreamId = DateTime.now().millisecondsSinceEpoch;
+
       await CameraPlatform.instance.initializeCamera(
         _cameraId,
         imageFormatGroup: imageFormatGroup ?? ImageFormatGroup.unknown,
@@ -367,6 +369,7 @@ class CameraController extends ValueNotifier<CameraValue> {
         cropBottomPercent: cropBottomPercent,
         cropRightPercent: cropRightPercent,
         cropTopPercent: cropTopPercent,
+        barcodeStreamId: barcodeStreamId,
       );
 
       value = value.copyWith(
@@ -403,10 +406,12 @@ class CameraController extends ValueNotifier<CameraValue> {
           .onDeviceTiltsChanged()
           .listen(_deviceTiltsListener);
 
-      final barcodeStream =
-          EventChannel('plugins.flutter.io/camera/barcodeStream')
-              .receiveBroadcastStream()
-              .map(_toCameraBarcode);
+      final eventChannelName =
+          'plugins.flutter.io/camera/barcodeStream/$barcodeStreamId';
+
+      final barcodeStream = EventChannel(eventChannelName)
+          .receiveBroadcastStream()
+          .map(_toCameraBarcode);
       _barcodeStreamCompleter.complete(barcodeStream);
     } on PlatformException catch (e) {
       throw CameraException(e.code, e.message);
@@ -981,6 +986,7 @@ class CameraController extends ValueNotifier<CameraValue> {
     unawaited(_deviceTiltsSubscription?.cancel());
     unawaited(_deviceLogErrorSubscription?.cancel());
     unawaited(_deviceLogInfoSubscription?.cancel());
+    value = value.copyWith(isInitialized: false);
   }
 
   void _throwIfNotInitialized(String functionName) {

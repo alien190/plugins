@@ -113,6 +113,7 @@ class MethodChannelCamera extends CameraPlatform {
     int cropRightPercent = 0,
     int cropTopPercent = 0,
     int cropBottomPercent = 0,
+    int barcodeStreamId = 0,
   }) {
     _channels.putIfAbsent(cameraId, () {
       final channel = MethodChannel('flutter.io/cameraPlugin/camera$cameraId');
@@ -137,6 +138,7 @@ class MethodChannelCamera extends CameraPlatform {
         'cropRight': cropRightPercent,
         'cropTop': cropTopPercent,
         'cropBottom': cropBottomPercent,
+        'barcodeStreamId': barcodeStreamId,
       },
     );
 
