@@ -417,6 +417,7 @@ class CameraController extends ValueNotifier<CameraValue> {
 
   CameraBarcode _toCameraBarcode(dynamic event) {
     try {
+      print('_toCameraBarcode $event');
       return CameraBarcode.fromJson(event);
     } catch (error) {
       return CameraBarcode(
