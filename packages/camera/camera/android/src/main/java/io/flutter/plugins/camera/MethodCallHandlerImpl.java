@@ -38,7 +38,6 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
     private final PermissionsRegistry permissionsRegistry;
     private final TextureRegistry textureRegistry;
     private final MethodChannel methodChannel;
-    private final EventChannel barcodeStreamChannel;
     private @Nullable
     Camera camera;
 
@@ -55,7 +54,6 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
         this.textureRegistry = textureRegistry;
 
         methodChannel = new MethodChannel(messenger, "plugins.flutter.io/camera");
-        barcodeStreamChannel = new EventChannel(messenger, "plugins.flutter.io/camera/barcodeStream");
         methodChannel.setMethodCallHandler(this);
     }
 
@@ -112,6 +110,8 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
                                     cropTop,
                                     cropBottom
                             );
+                            final EventChannel barcodeStreamChannel =
+                                    new EventChannel(messenger, "plugins.flutter.io/camera/barcodeStream");
                             camera.open(call.argument("imageFormatGroup"), settings, barcodeStreamChannel);
                         } else {
                             camera.open(call.argument("imageFormatGroup"), null, null);
