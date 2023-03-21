@@ -978,7 +978,6 @@ class CameraController extends ValueNotifier<CameraValue> {
     unawaited(_cameraErrorSubscription?.cancel());
     unawaited(_cameraClosingSubscription?.cancel());
     _isDisposed = true;
-    super.dispose();
     if (_initCalled != null) {
       await _initCalled;
       await CameraPlatform.instance.dispose(_cameraId);
@@ -987,6 +986,7 @@ class CameraController extends ValueNotifier<CameraValue> {
     unawaited(_deviceLogErrorSubscription?.cancel());
     unawaited(_deviceLogInfoSubscription?.cancel());
     value = value.copyWith(isInitialized: false);
+    super.dispose();
   }
 
   void _throwIfNotInitialized(String functionName) {
