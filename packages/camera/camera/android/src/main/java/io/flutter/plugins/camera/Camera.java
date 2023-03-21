@@ -1170,7 +1170,9 @@ class Camera
 
                     @Override
                     public void onCancel(Object o) {
-                        imageStreamReader.setOnImageAvailableListener(null, backgroundHandler);
+                        if (imageStreamReader != null) {
+                            imageStreamReader.setOnImageAvailableListener(null, backgroundHandler);
+                        }
                         nextImageIsRequestedToBarcodeScan = false;
                         Camera.this.barcodeStreamSink = null;
                     }
