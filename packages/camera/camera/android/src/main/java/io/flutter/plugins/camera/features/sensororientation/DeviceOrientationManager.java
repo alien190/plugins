@@ -116,14 +116,16 @@ public class DeviceOrientationManager implements SensorEventListener {
             rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
         }
         if (rotationSensor != null) {
-            Log.i(TAG, "Rotation sensor has been initialized");
-            messenger.sendDeviceLogInfoMessageEvent("Rotation sensor has been initialized");
+            final String message = "Rotation sensor has been initialized";
+            Log.i(TAG, message);
+            messenger.sendDeviceLogInfoMessageEvent(message);
             sensorManager.registerListener(this, rotationSensor,
                     SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
             isVerticalTiltAvailable = true;
         } else {
-            Log.w(TAG, "Rotation sensor has NOT been initialized");
-            messenger.sendDeviceLogErrorMessageEvent("Rotation sensor has NOT been initialized");
+            final String message = "Rotation sensor has NOT been initialized";
+            Log.w(TAG, message);
+            messenger.sendDeviceLogErrorMessageEvent(message);
             isVerticalTiltAvailable = false;
             takePictureMode = TakePictureMode.unknownShot;
         }
@@ -134,7 +136,9 @@ public class DeviceOrientationManager implements SensorEventListener {
                     public void onOrientationChanged(int angle) {
                         PlatformChannel.DeviceOrientation newOrientation = calculateSensorOrientation(angle);
                         if (!newOrientation.equals(accelerometerOrientation) && isOrientationChangeAllowed()) {
-                            Log.d(TAG, "sensor orientation set:" + newOrientation.toString());
+                            final String message = "OrientationEventListener set orientation:" + newOrientation;
+                            Log.d(TAG, message);
+                            messenger.sendDeviceLogInfoMessageEvent(message);
                             accelerometerOrientation = newOrientation;
                             messenger.sendDeviceOrientationChangeEvent(newOrientation);
                         }
