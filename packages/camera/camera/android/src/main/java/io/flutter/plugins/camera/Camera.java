@@ -41,8 +41,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
+import com.google.zxing.BarcodeFormat;
 import com.google.zxing.Binarizer;
 import com.google.zxing.BinaryBitmap;
+import com.google.zxing.DecodeHintType;
 import com.google.zxing.LuminanceSource;
 import com.google.zxing.MultiFormatReader;
 import com.google.zxing.NotFoundException;
@@ -88,6 +90,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.Executors;
 
 @FunctionalInterface
@@ -1215,6 +1218,13 @@ class Camera
 
     private void setBarcodeStreamAvailableListener(BarcodeCaptureSettings settings) {
         final MultiFormatReader barcodeReader = new MultiFormatReader();
+        final Map<DecodeHintType, Object> hints = new HashMap<>();
+        final List<BarcodeFormat> formats = new ArrayList<>();
+        formats.add(BarcodeFormat.EAN_8);
+        formats.add(BarcodeFormat.EAN_13);
+        formats.add(BarcodeFormat.RSS_EXPANDED);
+        hints.put(DecodeHintType.POSSIBLE_FORMATS, formats);
+        barcodeReader.setHints(hints);
 
         imageStreamReader.setOnImageAvailableListener(
                 reader -> {
