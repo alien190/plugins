@@ -1223,6 +1223,7 @@ class Camera
         formats.add(BarcodeFormat.EAN_8);
         formats.add(BarcodeFormat.EAN_13);
         formats.add(BarcodeFormat.RSS_EXPANDED);
+        formats.add(BarcodeFormat.RSS_14);
         hints.put(DecodeHintType.POSSIBLE_FORMATS, formats);
         barcodeReader.setHints(hints);
 
