@@ -19,7 +19,7 @@ class FakeController extends ValueNotifier<CameraValue>
   FakeController() : super(const CameraValue.uninitialized());
 
   @override
-  Future<void> dispose() async {
+  Future<void> dispose({int sessionId = 0}) async {
     super.dispose();
   }
 
@@ -164,12 +164,14 @@ class FakeController extends ValueNotifier<CameraValue>
   Stream<CameraBarcode> get cameraBarcodesStream => Stream.fromIterable([]);
 
   @override
-  Future<void> initialize(
-      {bool isBarcodeStreamEnabled = false,
-      int cropLeftPercent = 0,
-      int cropRightPercent = 0,
-      int cropTopPercent = 0,
-      int cropBottomPercent = 0}) async {}
+  Future<void> initialize({
+    bool isBarcodeStreamEnabled = false,
+    int cropLeftPercent = 0,
+    int cropRightPercent = 0,
+    int cropTopPercent = 0,
+    int cropBottomPercent = 0,
+    int sessionId = 0,
+  }) async {}
 
   @override
   Future<Stream<CameraBarcode>> get barcodeStream =>

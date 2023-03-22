@@ -319,6 +319,7 @@ class CameraController extends ValueNotifier<CameraValue> {
     int cropRightPercent = 0,
     int cropTopPercent = 0,
     int cropBottomPercent = 0,
+    int sessionId = 0,
   }) async {
     if (_isDisposed) {
       throw CameraException(
@@ -370,6 +371,7 @@ class CameraController extends ValueNotifier<CameraValue> {
         cropRightPercent: cropRightPercent,
         cropTopPercent: cropTopPercent,
         barcodeStreamId: barcodeStreamId,
+        sessionId: sessionId,
       );
 
       value = value.copyWith(
@@ -970,7 +972,7 @@ class CameraController extends ValueNotifier<CameraValue> {
 
   /// Releases the resources of this camera.
   @override
-  Future<void> dispose() async {
+  Future<void> dispose({int sessionId = 0}) async {
     if (_isDisposed) {
       return;
     }
@@ -980,7 +982,7 @@ class CameraController extends ValueNotifier<CameraValue> {
     _isDisposed = true;
     if (_initCalled != null) {
       await _initCalled;
-      await CameraPlatform.instance.dispose(_cameraId);
+      await CameraPlatform.instance.dispose(_cameraId, sessionId: sessionId);
     }
     unawaited(_deviceTiltsSubscription?.cancel());
     unawaited(_deviceLogErrorSubscription?.cancel());

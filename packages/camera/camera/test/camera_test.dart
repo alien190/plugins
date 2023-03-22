@@ -1391,6 +1391,7 @@ class MockCameraPlatform extends Mock
     int cropTopPercent = 0,
     int cropBottomPercent = 0,
     int barcodeStreamId = 0,
+    int sessionId = 0,
   }) async =>
       super.noSuchMethod(Invocation.method(
         #initializeCamera,
@@ -1401,7 +1402,7 @@ class MockCameraPlatform extends Mock
       ));
 
   @override
-  Future<void> dispose(int? cameraId) async {
+  Future<void> dispose(int? cameraId, {int sessionId = 0}) async {
     return super.noSuchMethod(Invocation.method(#dispose, [cameraId]));
   }
 
