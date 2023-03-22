@@ -76,6 +76,7 @@ abstract class CameraPlatform extends PlatformInterface {
     int cropTopPercent = 0,
     int cropBottomPercent = 0,
     int barcodeStreamId = 0,
+    int sessionId = 0,
   }) {
     throw UnimplementedError('initializeCamera() is not implemented.');
   }
@@ -276,7 +277,10 @@ abstract class CameraPlatform extends PlatformInterface {
   }
 
   /// Releases the resources of this camera.
-  Future<void> dispose(int cameraId) {
+  Future<void> dispose(
+    int cameraId, {
+    int sessionId = 0,
+  }) {
     throw UnimplementedError('dispose() is not implemented.');
   }
 }

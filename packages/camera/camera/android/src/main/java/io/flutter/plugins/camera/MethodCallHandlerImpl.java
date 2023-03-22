@@ -8,6 +8,7 @@ import android.app.Activity;
 import android.hardware.camera2.CameraAccessException;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -32,6 +33,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
+    private static final String TAG = "MethodCallHandlerImpl";
     private final Activity activity;
     private final BinaryMessenger messenger;
     private final CameraPermissions cameraPermissions;
@@ -40,6 +42,9 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
     private final MethodChannel methodChannel;
     private @Nullable
     Camera camera;
+
+    private @Nullable
+    Long cameraSessionId;
 
     MethodCallHandlerImpl(
             Activity activity,
@@ -92,6 +97,11 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
             case "initialize": {
                 if (camera != null) {
                     try {
+                        Long sessionId = call.argument("sessionId");
+                        if (sessionId == null) sessionId = 0L;
+                        Log.d(TAG, "Camera initialize. sessionId=" + sessionId);
+                        cameraSessionId = sessionId;
+
                         final Boolean isBarcodeStreamEnabled = call.argument("isBarcodeStreamEnabled");
                         if (isBarcodeStreamEnabled != null && isBarcodeStreamEnabled) {
                             Integer cropLeft = call.argument("cropLeft");
@@ -346,7 +356,18 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
             case "dispose": {
                 try {
                     if (camera != null) {
-                        camera.dispose();
+                        Long sessionId = call.argument("sessionId");
+                        if (sessionId == null) sessionId = 0L;
+                        if (cameraSessionId == null || cameraSessionId.equals(sessionId)) {
+                            Log.d(TAG, "Camera dispose. sessionId=" + sessionId);
+                            cameraSessionId = null;
+                            camera.dispose();
+                        } else {
+                            Log.w(TAG, "Camera dispose request is ignored because" +
+                                    " sessionId=" + sessionId +
+                                    ", cameraSessionId=" + cameraSessionId
+                            );
+                        }
                     }
                     result.success(null);
                 } catch (Exception e) {

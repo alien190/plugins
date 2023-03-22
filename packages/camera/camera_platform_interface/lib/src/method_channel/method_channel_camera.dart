@@ -114,6 +114,7 @@ class MethodChannelCamera extends CameraPlatform {
     int cropTopPercent = 0,
     int cropBottomPercent = 0,
     int barcodeStreamId = 0,
+    int sessionId = 0,
   }) {
     _channels.putIfAbsent(cameraId, () {
       final channel = MethodChannel('flutter.io/cameraPlugin/camera$cameraId');
@@ -139,6 +140,7 @@ class MethodChannelCamera extends CameraPlatform {
         'cropTop': cropTopPercent,
         'cropBottom': cropBottomPercent,
         'barcodeStreamId': barcodeStreamId,
+        'sessionId': sessionId,
       },
     );
 
@@ -146,7 +148,10 @@ class MethodChannelCamera extends CameraPlatform {
   }
 
   @override
-  Future<void> dispose(int cameraId) async {
+  Future<void> dispose(
+    int cameraId, {
+    int sessionId = 0,
+  }) async {
     if (_channels.containsKey(cameraId)) {
       final cameraChannel = _channels[cameraId];
       cameraChannel?.setMethodCallHandler(null);
@@ -155,7 +160,10 @@ class MethodChannelCamera extends CameraPlatform {
 
     await _channel.invokeMethod<void>(
       'dispose',
-      <String, dynamic>{'cameraId': cameraId},
+      <String, dynamic>{
+        'cameraId': cameraId,
+        'sessionId': sessionId,
+      },
     );
   }
 
