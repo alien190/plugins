@@ -97,8 +97,7 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
             case "initialize": {
                 if (camera != null) {
                     try {
-                        Long sessionId = call.argument("sessionId");
-                        if (sessionId == null) sessionId = 0L;
+                        final Long sessionId = getSessionId(call);
                         Log.d(TAG, "Camera initialize. sessionId=" + sessionId);
                         cameraSessionId = sessionId;
 
@@ -356,8 +355,8 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
             case "dispose": {
                 try {
                     if (camera != null) {
-                        Long sessionId = call.argument("sessionId");
-                        if (sessionId == null) sessionId = 0L;
+                        final Long sessionId = getSessionId(call);
+
                         if (cameraSessionId == null || cameraSessionId.equals(sessionId)) {
                             Log.d(TAG, "Camera dispose. sessionId=" + sessionId);
                             cameraSessionId = null;
@@ -378,6 +377,28 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
             default:
                 result.notImplemented();
                 break;
+        }
+    }
+
+    private Long getSessionId(@NonNull MethodCall call) {
+        try {
+            final Long sessionId = call.argument("sessionId");
+            if (sessionId == null) {
+                return 0L;
+            } else {
+                return sessionId;
+            }
+        } catch (ClassCastException exception) {
+            try {
+                final Integer sessionId = call.argument("sessionId");
+                if (sessionId == null) {
+                    return 0L;
+                } else {
+                    return sessionId.longValue();
+                }
+            } catch (Exception exception1) {
+                return 0L;
+            }
         }
     }
 
