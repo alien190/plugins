@@ -50,7 +50,7 @@ public class ImageSaver implements Runnable {
     private final DeviceTilts deviceTilts;
 
     private final Integer imageQuality;
-    
+
     private final double targetImageRotation;
 
     /**
@@ -132,7 +132,7 @@ public class ImageSaver implements Runnable {
             output = FileOutputStreamFactory.create(file);
             dstBitmap.compress(Bitmap.CompressFormat.JPEG, imageQuality, output);
 
-            callback.onComplete(getTakePictureResult());
+            callback.onComplete(getTakePictureResult(dstBitmap.getWidth(), dstBitmap.getHeight()));
             Log.w(TAG, "onComplete()");
             srcBitmap.recycle();
             dstBitmap.recycle();
@@ -154,14 +154,16 @@ public class ImageSaver implements Runnable {
         }
     }
 
-    private TakePictureResult getTakePictureResult() {
+    private TakePictureResult getTakePictureResult(int width, int height) {
         return new TakePictureResult(
                 file.getAbsolutePath(),
                 deviceTilts.horizontalTilt,
                 deviceTilts.verticalTilt,
                 deviceTilts.isHorizontalTiltAvailable,
                 deviceTilts.isVerticalTiltAvailable,
-                deviceTilts.mode
+                deviceTilts.mode,
+                width,
+                height
         );
     }
 

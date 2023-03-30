@@ -22,6 +22,12 @@ class TakePictureResult {
   /// The mode of the picture taking
   final TakePictureMode mode;
 
+  /// The image width
+  final int width;
+
+  /// The image height
+  final int height;
+
   /// Default constructor
   TakePictureResult({
     required this.file,
@@ -30,6 +36,8 @@ class TakePictureResult {
     required this.verticalTilt,
     required this.horizontalTilt,
     required this.mode,
+    required this.width,
+    required this.height,
   });
 
   /// Converts the supplied [Map] to an instance of the [TakePictureResult]
@@ -40,31 +48,36 @@ class TakePictureResult {
         isHorizontalTiltAvailable = json['isHorizontalTiltAvailable'],
         isVerticalTiltAvailable = json['isVerticalTiltAvailable'],
         file = XFile(json['resultPath']),
-        mode = (json['mode'] as String).toTakePictureMode;
+        mode = (json['mode'] as String).toTakePictureMode,
+        width = json['width'],
+        height = json['height'];
 
   /// Converts the [TakePictureResult] instance into a [Map] instance that
   /// can be serialized to JSON.
-  Map<String, dynamic> toJson() =>
-      {
+  Map<String, dynamic> toJson() => {
         'verticalTilt': verticalTilt,
         'horizontalTilt': horizontalTilt,
         'isHorizontalTiltAvailable': isHorizontalTiltAvailable,
         'isVerticalTiltAvailable': isVerticalTiltAvailable,
         'resultPath': file.path,
         'mode': mode.toStringValue,
+        'width': width,
+        'height': height,
       };
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-          other is TakePictureResult &&
-              runtimeType == other.runtimeType &&
-              file == other.file &&
-              isVerticalTiltAvailable == other.isVerticalTiltAvailable &&
-              isHorizontalTiltAvailable == other.isHorizontalTiltAvailable &&
-              verticalTilt == other.verticalTilt &&
-              horizontalTilt == other.horizontalTilt &&
-              mode == other.mode;
+      other is TakePictureResult &&
+          runtimeType == other.runtimeType &&
+          file == other.file &&
+          isVerticalTiltAvailable == other.isVerticalTiltAvailable &&
+          isHorizontalTiltAvailable == other.isHorizontalTiltAvailable &&
+          verticalTilt == other.verticalTilt &&
+          horizontalTilt == other.horizontalTilt &&
+          mode == other.mode &&
+          width == other.width &&
+          height == other.height;
 
   @override
   int get hashCode =>
@@ -73,10 +86,12 @@ class TakePictureResult {
       isHorizontalTiltAvailable.hashCode ^
       verticalTilt.hashCode ^
       horizontalTilt.hashCode ^
-      mode.hashCode;
+      mode.hashCode ^
+      width.hashCode ^
+      height.hashCode;
 
   @override
   String toString() {
-    return 'TakePictureResult{file: $file, isVerticalTiltAvailable: $isVerticalTiltAvailable, isHorizontalTiltAvailable: $isHorizontalTiltAvailable, verticalTilt: $verticalTilt, horizontalTilt: $horizontalTilt, mode: $mode}';
+    return 'TakePictureResult{file: $file, isVerticalTiltAvailable: $isVerticalTiltAvailable, isHorizontalTiltAvailable: $isHorizontalTiltAvailable, verticalTilt: $verticalTilt, horizontalTilt: $horizontalTilt, mode: $mode, width: $width, height: $height}';
   }
 }
