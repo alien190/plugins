@@ -119,6 +119,8 @@ class FakeController extends ValueNotifier<CameraValue>
         verticalTilt: 0,
         horizontalTilt: 0,
         mode: TakePictureMode.unknownShot,
+        width: 1200,
+        height: 1600,
       );
 
   Future<void> startTakingPictureAnimation() async {}

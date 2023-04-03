@@ -52,6 +52,8 @@ TakePictureResult mockTakePicture = TakePictureResult(
   verticalTilt: 0,
   horizontalTilt: 0,
   mode: TakePictureMode.unknownShot,
+  height: 1200,
+  width: 1600,
 );
 
 get mockVideoRecordingXFile => null;
