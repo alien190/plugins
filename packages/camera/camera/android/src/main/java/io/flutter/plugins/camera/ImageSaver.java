@@ -91,7 +91,7 @@ public class ImageSaver implements Runnable {
                 output = FileOutputStreamFactory.create(file);
                 output.write(bytes);
 
-                callback.onComplete(getTakePictureResult());
+                callback.onComplete(getTakePictureResult(image.getWidth(), image.getHeight()));
                 Log.w(TAG, "onComplete()");
                 return;
             }
