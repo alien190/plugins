@@ -987,7 +987,6 @@ class CameraController extends ValueNotifier<CameraValue> {
     unawaited(_deviceTiltsSubscription?.cancel());
     unawaited(_deviceLogErrorSubscription?.cancel());
     unawaited(_deviceLogInfoSubscription?.cancel());
-    value = value.copyWith(isInitialized: false);
     super.dispose();
   }
 
