@@ -136,7 +136,9 @@ previewPhotoSampleBuffer:(CMSampleBufferRef)previewPhotoSampleBuffer
           [_result sendErrorWithCode:@"IOError" message:@"Unable to write file" details:nil];
           return;
         }
-        
+        UIImage* image = [[UIImage alloc] initWithData:data];
+        _deviceAnglesAndPathDict[@"width"] = @((int)image.size.width);
+        _deviceAnglesAndPathDict[@"height"] = @((int)image.size.height);
         [_result sendSuccessWithData:_deviceAnglesAndPathDict];
     }
 }
@@ -182,6 +184,8 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
     CGRect destRect = CGRectApplyAffineTransform(scaledRect, rotationTransform);
     
     CGSize destinationSize = CGSizeMake(destRect.size.width, destRect.size.height);
+    _deviceAnglesAndPathDict[@"width"] = @((int)destRect.size.width);
+    _deviceAnglesAndPathDict[@"height"] = @((int)destRect.size.height);
     
     // Draw image
     UIGraphicsBeginImageContext(destinationSize);
