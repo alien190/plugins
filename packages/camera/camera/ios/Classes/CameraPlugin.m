@@ -16,8 +16,6 @@
 
 int const DEFAULT_43FORMAT_LONG_SIDE_SIZE = 1600;
 int const DEFAULT_43FORMAT_IMAGE_QUALITY = 100;
-//int const PREFFERED_43FORMAT_WIDTH = 1600;
-//int const PREFFERED_43FORMAT_HEIGHT = 1200;
 float const PREFFERED_43FORMAT_LOW_ASPECT_RATIO = 1.3;
 float const PREFFERED_43FORMAT_HIGH_ASPECT_RATIO = 1.4;
 
@@ -93,11 +91,11 @@ typedef enum {
 }
 
 - initWithPath:(NSString *)   path result:(FLTThreadSafeFlutterResult *)result
-                 targetImageRotationInRad:(double)targetImageRotationInRad
-                         resolutionPreset:(ResolutionPreset)resolutionPreset
-                             longSideSize:(int)longSideSize
-                             imageQuality:(int)imageQuality
-                         deviceAnglesDict:(NSMutableDictionary*)deviceAnglesDict{
+targetImageRotationInRad:(double)targetImageRotationInRad
+resolutionPreset:(ResolutionPreset)resolutionPreset
+  longSideSize:(int)longSideSize
+  imageQuality:(int)imageQuality
+deviceAnglesDict:(NSMutableDictionary*)deviceAnglesDict{
     self = [super init];
     NSAssert(self, @"super init cannot be nil");
     _path = path;
@@ -133,8 +131,8 @@ previewPhotoSampleBuffer:(CMSampleBufferRef)previewPhotoSampleBuffer
     } else {
         bool success = [data writeToFile:_path atomically:YES];
         if (!success) {
-          [_result sendErrorWithCode:@"IOError" message:@"Unable to write file" details:nil];
-          return;
+            [_result sendErrorWithCode:@"IOError" message:@"Unable to write file" details:nil];
+            return;
         }
         UIImage* image = [[UIImage alloc] initWithData:data];
         _deviceAnglesAndPathDict[@"width"] = @((int)image.size.width);
@@ -153,14 +151,14 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
     }
     
     NSData *photoData = [photo fileDataRepresentation];
-
+    
     if ( _resolutionPreset == custom43 ) {
         [self processPhotoData:photoData];
     } else {
         bool success = [photoData writeToFile:_path atomically:YES];
         if (!success) {
-          [_result sendErrorWithCode:@"IOError" message:@"Unable to write file" details:nil];
-          return;
+            [_result sendErrorWithCode:@"IOError" message:@"Unable to write file" details:nil];
+            return;
         }
         [_result sendSuccessWithData:_deviceAnglesAndPathDict];
     }
@@ -176,7 +174,7 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
     } else {
         ratio = ((double)_longSideSize) / image.size.height;
     }
-
+    
     CGAffineTransform scaleTransform = CGAffineTransformMakeScale(ratio, ratio);
     
     CGRect sizeRect = (CGRect) {.size = image.size};
@@ -200,7 +198,7 @@ didFinishProcessingPhoto:(AVCapturePhoto *)photo
     UIGraphicsEndImageContext();
     
     NSData* dstImageData = UIImageJPEGRepresentation(newImage, ((float)_imageQality / 100));
-
+    
     bool success = [dstImageData writeToFile:_path atomically:YES];
     if (!success) {
         [_result sendErrorWithCode:@"IOError" message:@"Unable to write file" details:nil];
@@ -455,6 +453,17 @@ AVCaptureAudioDataOutputSampleBufferDelegate>
 @property(assign, atomic) double horizontalTiltToPublish;
 @property(assign, atomic) double verticalTiltToPublish;
 @property(readonly, nonatomic) FlutterMethodChannel *deviceEventMethodChannel;
+@property(assign, atomic) BOOL isBarcodeStreamEnabled;
+@property(assign, atomic) BOOL isNextFrameToBarcodeScanRequired;
+@property(assign, atomic) long barcodeStreamId;;
+@property(assign, atomic) int barcodeCropLeft;
+@property(assign, atomic) int barcodeCropRight;
+@property(assign, atomic) int barcodeCropTop;
+@property(assign, atomic) int barcodeCropBottom;
+@property(readonly, nonatomic) ZXMultiFormatReader *barcodeReader;
+@property(readonly, nonatomic) ZXDecodeHints *barcodeHints;
+@property(nonatomic) FlutterEventChannel *barcodeEventChannel;
+@property(nonatomic) BarcodeStreamHandler *barcodeStreamHandler;
 @end
 
 @implementation FLTCam {
@@ -475,7 +484,7 @@ NSString *const errorMethod = @"error";
                        orientation:(UIDeviceOrientation)orientation
                      dispatchQueue:(dispatch_queue_t)dispatchQueue
                              error:(NSError **)error
-          deviceEventMethodChannel:(FlutterMethodChannel *)deviceEventMethodChannel{
+          deviceEventMethodChannel:(FlutterMethodChannel *)deviceEventMethodChannel {
     self = [super init];
     NSAssert(self, @"super init cannot be nil");
     @try {
@@ -495,6 +504,13 @@ NSString *const errorMethod = @"error";
     _longSideSize = longSideSize > 0 ? longSideSize : DEFAULT_43FORMAT_LONG_SIDE_SIZE;
     _imageQality = imageQuality > 0 ? imageQuality : DEFAULT_43FORMAT_IMAGE_QUALITY;
     _deviceEventMethodChannel = deviceEventMethodChannel;
+    _isBarcodeStreamEnabled = false;
+    _barcodeStreamId = 0;
+    _isNextFrameToBarcodeScanRequired = false;
+    _barcodeCropTop = 0;
+    _barcodeCropLeft = 0;
+    _barcodeCropRight = 0;
+    _barcodeCropBottom = 0;
     
     NSError *localError = nil;
     _captureVideoInput = [AVCaptureDeviceInput deviceInputWithDevice:_captureDevice
@@ -504,7 +520,7 @@ NSString *const errorMethod = @"error";
         *error = localError;
         return nil;
     }
-        
+    
     _captureVideoOutput = [AVCaptureVideoDataOutput new];
     _captureVideoOutput.videoSettings =
     @{(NSString *)kCVPixelBufferPixelFormatTypeKey : @(videoFormat)};
@@ -546,7 +562,7 @@ NSString *const errorMethod = @"error";
     _isHorizontalTiltAvailable = false;
     _horizontalTilt = 0;
     _verticalTilt = 0;
-        
+    
     if ([_motionManager isAccelerometerAvailable]) {
         _isHorizontalTiltAvailable = true;
         
@@ -578,8 +594,8 @@ NSString *const errorMethod = @"error";
                 double overheadVerticalTilt = 0;
                 double overheadHorizontalTilt = 0;
                 int targetRotation = self->_lockedCaptureOrientation == UIDeviceOrientationUnknown
-                                    ? [self getRotationAngleForOrintation:self->_uiDeviceOrientation]
-                                    : (int)self->_targetImageRotation;
+                ? [self getRotationAngleForOrintation:self->_uiDeviceOrientation]
+                : (int)self->_targetImageRotation;
                 
                 switch(targetRotation) {
                     case 0:
@@ -631,27 +647,27 @@ NSString *const errorMethod = @"error";
                 [self setAccelerometerDeviceOrientation: UIDeviceOrientationPortrait];
             }
         }
-    
+        
         self->_targetImageRotation =
         (self->_lockedCaptureOrientation == UIDeviceOrientationUnknown && self->_accelerometerDeviceOrientation == self->_uiDeviceOrientation)? 0 :
         (self->_accelerometerDeviceOrientation != self->_uiDeviceOrientation
-                            // when UI orientation is fixed in the device settings
-                            ? [self getRotationAngleForOrintation:self->_accelerometerDeviceOrientation] -
-                            [self getRotationAngleForOrintation:self->_uiDeviceOrientation]
-                            // when UI orientation changing is allowed in the device settings
-                            : [self getRotationAngleForOrintation:self->_uiDeviceOrientation] -
-                            [self getRotationAngleForOrintation:self->_lockedCaptureOrientation]);
+         // when UI orientation is fixed in the device settings
+         ? [self getRotationAngleForOrintation:self->_accelerometerDeviceOrientation] -
+         [self getRotationAngleForOrintation:self->_uiDeviceOrientation]
+         // when UI orientation changing is allowed in the device settings
+         : [self getRotationAngleForOrintation:self->_uiDeviceOrientation] -
+         [self getRotationAngleForOrintation:self->_lockedCaptureOrientation]);
         //NSLog(@"targetImageRotation=%f", self->_targetImageRotation);
     }
     
     if(!_isVerticalTiltAvailable || (_verticalTilt <= 45 && _verticalTilt >= -45)) {
         double horizontalTilt = self->_lockedCaptureOrientation == UIDeviceOrientationUnknown
-            /// Image capture orientation is not locked
-            ?(self->_accelerometerDeviceOrientation == self->_uiDeviceOrientation ?
-              /// UI is not locked, so the UI orientation is equal the accelerometer orientation
-              [self getRotationAngleForOrintation:self->_uiDeviceOrientation] - accelerometerAngle
-              /// UI is locked, so the UI orientation is not equal accelerometer orientation
-              :[self getRotationAngleForOrintation:self->_accelerometerDeviceOrientation] - accelerometerAngle)
+        /// Image capture orientation is not locked
+        ?(self->_accelerometerDeviceOrientation == self->_uiDeviceOrientation ?
+          /// UI is not locked, so the UI orientation is equal the accelerometer orientation
+          [self getRotationAngleForOrintation:self->_uiDeviceOrientation] - accelerometerAngle
+          /// UI is locked, so the UI orientation is not equal accelerometer orientation
+          :[self getRotationAngleForOrintation:self->_accelerometerDeviceOrientation] - accelerometerAngle)
         : self->_targetImageRotation - accelerometerAngle;
         
         self->_horizontalTilt = fabs(horizontalTilt) > 90 ? horizontalTilt + 360 : horizontalTilt;
@@ -689,18 +705,40 @@ NSString *const errorMethod = @"error";
     dict[@"horizontalTilt"] = @(_horizontalTiltToPublish);
     dict[@"verticalTilt"] = @(_verticalTiltToPublish);
     dict[@"mode"] = _isVerticalTiltAvailable
-                    ? (_verticalTilt <= 45 && _verticalTilt >= -45 ? @"normalShot" : @"overheadShot" )
-                    : @"unknownShot";
+    ? (_verticalTilt <= 45 && _verticalTilt >= -45 ? @"normalShot" : @"overheadShot" )
+    : @"unknownShot";
     dict[@"targetImageRotation"] = @(_targetImageRotation);
     dict[@"lockedCaptureAngle"] = @(_lockedCaptureOrientation != UIDeviceOrientationUnknown
-                                    ? [self getRotationAngleForOrintation:_lockedCaptureOrientation]
-                                    : -1);
+    ? [self getRotationAngleForOrintation:_lockedCaptureOrientation]
+    : -1);
     dict[@"deviceOrientationAngle"] = @([self getRotationAngleForOrintation:_uiDeviceOrientation]);
     dict[@"isUIRotationEqualAccRotation"] =@((bool)(self->_accelerometerDeviceOrientation == self->_uiDeviceOrientation ? true : false));
     return dict;
 }
 
 - (void)start {
+    if(_isBarcodeStreamEnabled) {
+        _barcodeHints = [ZXDecodeHints hints];
+        [_barcodeHints addPossibleFormat:kBarcodeFormatEan8];
+        [_barcodeHints addPossibleFormat:kBarcodeFormatEan13];
+        [_barcodeHints addPossibleFormat:kBarcodeFormatRSSExpanded];
+        [_barcodeHints addPossibleFormat:kBarcodeFormatRSS14];
+        
+        _barcodeReader = [ZXMultiFormatReader reader];
+        _isNextFrameToBarcodeScanRequired = true;
+        
+        if(_barcodeEventChannel != nil) {
+            _barcodeStreamHandler = [[BarcodeStreamHandler alloc] init];
+            if (!NSThread.isMainThread) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [self->_barcodeEventChannel setStreamHandler:self->_barcodeStreamHandler];
+                });
+            } else {
+                [_barcodeEventChannel setStreamHandler:_barcodeStreamHandler];
+            }
+            
+        }
+    }
     [_captureSession startRunning];
 }
 
@@ -826,19 +864,19 @@ NSString *const errorMethod = @"error";
 
 
 - (NSCameraResolution*)setCaptureSessionPreset:(ResolutionPreset)resolutionPreset
-                  captureDevice:(AVCaptureDevice *)captureDevice{
+                                 captureDevice:(AVCaptureDevice *)captureDevice{
     
     [self setCaptureSessionDefaultPreset:resolutionPreset];
     
     
     if(resolutionPreset == custom43) {
         NSMutableArray* resolutions = [[NSMutableArray alloc] init];
-
+        
         for (AVCaptureDeviceFormat* format in captureDevice.formats) {
             CMVideoFormatDescriptionRef formatDescription = format.formatDescription;
             CMVideoDimensions dimentions = CMVideoFormatDescriptionGetDimensions(formatDescription);
             FourCharCode mediaSubType = CMFormatDescriptionGetMediaSubType(formatDescription);
-
+            
             float aspectRatio = ((float) dimentions.width) / dimentions.height;
             
             if(aspectRatio >= PREFFERED_43FORMAT_LOW_ASPECT_RATIO &&
@@ -852,10 +890,10 @@ NSString *const errorMethod = @"error";
                 [resolutions addObject:resolution];
             }
         }
-
+        
         [resolutions sortUsingComparator:compareCamaraResolution];
         NSMutableArray* selectedResolutions = [[NSMutableArray alloc] init];
-     
+        
         for(NSCameraResolution* resolution in resolutions) {
             if(resolution.width >= _longSideSize) {
                 [selectedResolutions addObject:resolution];
@@ -867,7 +905,7 @@ NSString *const errorMethod = @"error";
         NSCameraResolution* resolution;
         
         if([selectedResolutions count] > 0) {
-           resolution = [selectedResolutions objectAtIndex:0];
+            resolution = [selectedResolutions objectAtIndex:0];
         } else {
             resolution = [resolutions lastObject];
         }
@@ -1129,8 +1167,80 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         
         CFRelease(sampleBuffer);
     }
+    
+    if(_isBarcodeStreamEnabled && _isNextFrameToBarcodeScanRequired) {
+        _isNextFrameToBarcodeScanRequired = false;
+        
+        CVPixelBufferRef pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
+        CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+        size_t imageWidth = CVPixelBufferGetWidth(pixelBuffer);
+        size_t imageHeight = CVPixelBufferGetHeight(pixelBuffer);
+        size_t left = imageWidth * ((float)_barcodeCropLeft / 100);
+        size_t right = imageWidth * ((float)_barcodeCropRight / 100);
+        size_t top = imageHeight * ((float)_barcodeCropTop / 100);
+        size_t bottom = imageHeight * ((float)_barcodeCropBottom / 100);
+        
+        ZXLuminanceSource *source = [
+            [ZXCGImageLuminanceSource alloc]
+            initWithBuffer:pixelBuffer
+            left: left
+            top: top
+            width: imageWidth - left - right
+            height: imageHeight - top - bottom];
+        
+        CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+        [self recognizeBarcode:source];
+    }
 }
 
+- (void)recognizeBarcode:(ZXLuminanceSource*)source {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        if(self->_barcodeReader != nil && self->_barcodeHints != nil && self->_barcodeStreamHandler != nil && self->_barcodeStreamHandler.eventSink != nil) {
+            
+            ZXBinaryBitmap *bitmap = [ZXBinaryBitmap binaryBitmapWithBinarizer:[ZXHybridBinarizer binarizerWithSource:source]];
+            
+            NSError *error = nil;
+            
+            ZXResult *result = [self->_barcodeReader decode:bitmap
+                                                      hints:self->_barcodeHints
+                                                      error:&error];
+            if (result) {
+                NSString *contents = result.text;
+                ZXBarcodeFormat format = result.barcodeFormat;
+                
+                NSMutableDictionary* dict = [NSMutableDictionary dictionary];
+                dict[@"text"] = result.text;
+                dict[@"format"] = [self barcodeFormatToString:result.barcodeFormat];
+                
+                self->_barcodeStreamHandler.eventSink(dict);
+            }
+            self->_isNextFrameToBarcodeScanRequired = true;
+        }
+    });
+}
+
+- (NSString*)barcodeFormatToString: (ZXBarcodeFormat) barcodeFormat {
+    switch(barcodeFormat) {
+        case kBarcodeFormatAztec: return @"Aztec";
+        case kBarcodeFormatCodabar : return @"Codabar";
+        case kBarcodeFormatCode39: return @"Code39";
+        case kBarcodeFormatCode93: return @"Code93";
+        case kBarcodeFormatCode128: return @"Code128";
+        case kBarcodeFormatDataMatrix: return @"DataMatrix";
+        case kBarcodeFormatEan8: return @"Ean8";
+        case kBarcodeFormatEan13: return @"Ean13";
+        case kBarcodeFormatITF: return @"ITF";
+        case kBarcodeFormatMaxiCode: return @"MaxiCode";
+        case kBarcodeFormatPDF417: return @"PDF417";
+        case kBarcodeFormatQRCode: return @"QRCode";
+        case kBarcodeFormatRSS14: return @"RSS14";
+        case kBarcodeFormatRSSExpanded: return @"RSSExpanded";
+        case kBarcodeFormatUPCA: return @"UPCA";
+        case kBarcodeFormatUPCE: return @"UPCE";
+        case kBarcodeFormatUPCEANExtension: return @"UPCEANExtension";
+    }
+    
+}
 - (CMSampleBufferRef)adjustTime:(CMSampleBufferRef)sample by:(CMTime)offset CF_RETURNS_RETAINED {
     CMItemCount count;
     CMSampleBufferGetSampleTimingInfoArray(sample, 0, nil, &count);
@@ -1516,12 +1626,12 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         
         if (!NSThread.isMainThread) {
             dispatch_async(dispatch_get_main_queue(), ^{
-              [eventChannel setStreamHandler:self->_imageStreamHandler];
+                [eventChannel setStreamHandler:self->_imageStreamHandler];
             });
-          } else {
-              [eventChannel setStreamHandler:_imageStreamHandler];
-          }
-                
+        } else {
+            [eventChannel setStreamHandler:_imageStreamHandler];
+        }
+        
         _isStreamingImages = YES;
     } else {
         [_methodChannel invokeMethod:errorMethod
@@ -1692,6 +1802,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 @property(readonly, nonatomic) NSObject<FlutterBinaryMessenger> *messenger;
 @property(readonly, nonatomic) FLTCam *camera;
 @property(readonly, nonatomic) FlutterMethodChannel *deviceEventMethodChannel;
+@property(readonly, nonatomic) long sessionId;
 @end
 
 @implementation CameraPlugin {
@@ -1735,16 +1846,16 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 - (void)orientationChanged:(NSNotification *)note {
     UIDevice *device = note.object;
     UIDeviceOrientation orientation = device.orientation;
-
+    
     if (orientation == UIDeviceOrientationFaceUp || orientation == UIDeviceOrientationFaceDown) {
         // Do not change when oriented flat.
         return;
     }
-
+    
     if (_camera) {
         [_camera setUiDeviceOrientation:orientation];
     }
-
+    
     [self sendDeviceOrientation:orientation];
 }
 
@@ -1780,13 +1891,13 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo completionHandler:^(BOOL granted){
             if(granted) {
                 NSObject* observer = [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
-                                                                      object:nil
-                                                                       queue:NSOperationQueue.mainQueue
-                                                                  usingBlock:
-                  ^(NSNotification* notification){
-                        successBloc();
-                        [[NSNotificationCenter defaultCenter] removeObserver:observer];
-                    }];
+                                                                                       object:nil
+                                                                                        queue:NSOperationQueue.mainQueue
+                                                                                   usingBlock:
+                                      ^(NSNotification* notification){
+                    successBloc();
+                    [[NSNotificationCenter defaultCenter] removeObserver:observer];
+                }];
             } else {
                 failBloc();
             }
@@ -1830,7 +1941,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         }
     } else if ([@"create" isEqualToString:call.method]) {
         [self checkCameraAuthorizationWithSuccessBloc:
-         ^{
+             ^{
             NSString *cameraName = call.arguments[@"cameraName"];
             NSString *resolutionPreset = call.arguments[@"resolutionPreset"];
             NSNumber *enableAudio = call.arguments[@"enableAudio"];
@@ -1861,8 +1972,8 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
                 }];
             }
         }
-        failBloc:
-         ^{
+                                             failBloc:
+             ^{
             [result sendError:
                  [NSError errorWithDomain:@"CameraPlugin"
                                      code:0
@@ -1872,7 +1983,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         }
         ];
         
-
+        
     } else if ([@"startImageStream" isEqualToString:call.method]) {
         [_camera startImageStreamWithMessenger:_messenger];
         [result sendSuccess];
@@ -1884,6 +1995,47 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         NSUInteger cameraId = ((NSNumber *)argsMap[@"cameraId"]).unsignedIntegerValue;
         if ([@"initialize" isEqualToString:call.method]) {
             NSString *videoFormatValue = ((NSString *)argsMap[@"imageFormatGroup"]);
+            _sessionId = [((NSNumber*)argsMap[@"sessionId"]) longValue];
+            
+            _camera.isBarcodeStreamEnabled = ((BOOL)argsMap[@"isBarcodeStreamEnabled"]);
+            if(_camera.isBarcodeStreamEnabled) {
+                _camera.barcodeStreamId = [((NSNumber*)argsMap[@"barcodeStreamId"]) longValue];
+                
+                _camera.barcodeCropLeft = [((NSNumber*)argsMap[@"cropLeft"]) intValue];
+                if(_camera.barcodeCropLeft < 0 || _camera.barcodeCropLeft > 100) {
+                    _camera.barcodeCropLeft = 0;
+                }
+                _camera.barcodeCropRight = [((NSNumber*)argsMap[@"cropRight"]) intValue];
+                if(_camera.barcodeCropRight < 0 || _camera.barcodeCropRight > 100) {
+                    _camera.barcodeCropRight = 0;
+                }
+                
+                _camera.barcodeCropTop = [((NSNumber*)argsMap[@"cropTop"]) intValue];
+                if(_camera.barcodeCropTop < 0 || _camera.barcodeCropTop > 100) {
+                    _camera.barcodeCropTop = 0;
+                }
+                
+                _camera.barcodeCropBottom = [((NSNumber*)argsMap[@"cropBottom"]) intValue];
+                if(_camera.barcodeCropBottom < 0 || _camera.barcodeCropBottom > 100) {
+                    _camera.barcodeCropBottom = 0;
+                }
+                
+                if(_camera.barcodeCropLeft + _camera.barcodeCropRight >= 100) {
+                    _camera.barcodeCropLeft = 0;
+                    _camera.barcodeCropRight = 0;
+                }
+                
+                if(_camera.barcodeCropTop + _camera.barcodeCropBottom >= 100) {
+                    _camera.barcodeCropTop = 0;
+                    _camera.barcodeCropBottom = 0;
+                }
+                
+                _camera.barcodeEventChannel = [FlutterEventChannel
+                                               eventChannelWithName:[NSString stringWithFormat:@"plugins.flutter.io/camera/barcodeStream/%lu",
+                                                                     (unsigned long)_camera.barcodeStreamId]
+                                               binaryMessenger:_messenger];
+            }
+            
             videoFormat = getVideoFormatFromString(videoFormatValue);
             
             __weak CameraPlugin *weakSelf = self;
@@ -1918,10 +2070,13 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
                 [result sendNotImplemented];
             }
         } else if ([@"dispose" isEqualToString:call.method]) {
-            [_registry unregisterTexture:cameraId];
-            [_camera close];
-            _dispatchQueue = nil;
-            [result sendSuccess];
+            long sessionId = [((NSNumber*)argsMap[@"sessionId"]) longValue];
+            if(sessionId == _sessionId) {
+                [_registry unregisterTexture:cameraId];
+                [_camera close];
+                _dispatchQueue = nil;
+                [result sendSuccess];
+            }
         } else if ([@"prepareForVideoRecording" isEqualToString:call.method]) {
             [_camera setUpCaptureSessionForAudio];
             [result sendSuccess];
@@ -1987,4 +2142,17 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
     }
 }
 
+@end
+
+@implementation BarcodeStreamHandler
+- (FlutterError *_Nullable)onCancelWithArguments:(id _Nullable)arguments {
+    _eventSink = nil;
+    return nil;
+}
+
+- (FlutterError *_Nullable)onListenWithArguments:(id _Nullable)arguments
+                                       eventSink:(nonnull FlutterEventSink)events {
+    _eventSink = events;
+    return nil;
+}
 @end

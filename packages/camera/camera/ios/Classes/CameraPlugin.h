@@ -3,6 +3,11 @@
 // found in the LICENSE file.
 
 #import <Flutter/Flutter.h>
+#import <ZXingObjC/ZXingObjC.h>
 
 @interface CameraPlugin : NSObject <FlutterPlugin>
+@end
+
+@interface BarcodeStreamHandler : NSObject <FlutterStreamHandler>
+@property FlutterEventSink eventSink;
 @end
