@@ -1205,14 +1205,13 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
                                                       hints:self->_barcodeHints
                                                       error:&error];
             if (result) {
-                NSString *contents = result.text;
-                ZXBarcodeFormat format = result.barcodeFormat;
-                
                 NSMutableDictionary* dict = [NSMutableDictionary dictionary];
                 dict[@"text"] = result.text;
                 dict[@"format"] = [self barcodeFormatToString:result.barcodeFormat];
                 
-                self->_barcodeStreamHandler.eventSink(dict);
+                if(self->_barcodeStreamHandler && self->_barcodeStreamHandler.eventSink) {
+                    self->_barcodeStreamHandler.eventSink(dict);
+                }
             }
             self->_isNextFrameToBarcodeScanRequired = true;
         }
