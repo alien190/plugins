@@ -8,6 +8,8 @@ import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
@@ -49,6 +51,7 @@ import com.google.zxing.LuminanceSource;
 import com.google.zxing.MultiFormatReader;
 import com.google.zxing.NotFoundException;
 import com.google.zxing.PlanarYUVLuminanceSource;
+import com.google.zxing.RGBLuminanceSource;
 import com.google.zxing.common.GlobalHistogramBinarizer;
 
 import io.flutter.embedding.engine.systemchannels.PlatformChannel;
@@ -84,7 +87,9 @@ import io.flutter.view.TextureRegistry.SurfaceTextureEntry;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -1239,9 +1244,10 @@ class Camera
                     }
 
                     nextImageIsRequestedToBarcodeScan = false;
-
-                    final ImageBytes bytes = removeStridesFromImage(img);
+                    final ImageBytes bytes = getBytesFromImage(img);
                     img.close();
+
+                    if (bytes == null) return;
 
                     barcodeBackgroundHandler.post(() -> {
                         try {
@@ -1257,15 +1263,20 @@ class Camera
 
                             for (int step = 0; step < 4; step++) {
                                 final LuminanceSource luminanceSource =
-                                        new PlanarYUVLuminanceSource(
-                                                downscaledBytes.getBytes(),
+                                        downscaledBytes.getImageFormat() == ImageFormat.YUV_420_888 ?
+                                                new PlanarYUVLuminanceSource(
+                                                        downscaledBytes.getBytes(),
+                                                        downscaledBytes.getWidth(),
+                                                        downscaledBytes.getHeight(),
+                                                        0,
+                                                        0,
+                                                        downscaledBytes.getWidth(),
+                                                        downscaledBytes.getHeight(),
+                                                        false
+                                                ) : new RGBLuminanceSource(
                                                 downscaledBytes.getWidth(),
                                                 downscaledBytes.getHeight(),
-                                                0,
-                                                0,
-                                                downscaledBytes.getWidth(),
-                                                downscaledBytes.getHeight(),
-                                                false
+                                                downscaledBytes.getPixels()
                                         );
 
 
@@ -1336,23 +1347,43 @@ class Camera
         final int srcWidth = srcImageBytes.getWidth();
         final int dstWidth = srcWidth / 2;
         final int dstHeight = srcImageBytes.getHeight() / 2;
-        final byte[] srcBytes = srcImageBytes.getBytes();
+        if (srcImageBytes.getBytes() != null) {
+            final byte[] srcBytes = srcImageBytes.getBytes();
+            byte[] dstBytes = new byte[dstWidth * dstHeight];
 
-        byte[] dstBytes = new byte[dstWidth * dstHeight];
+            for (int rowIndex = 0; rowIndex < dstHeight; rowIndex++) {
+                for (int colIndex = 0; colIndex < dstWidth; colIndex++) {
+                    final int byte00 = srcBytes[rowIndex * srcWidth * 2 + colIndex * 2];
+                    final int byte01 = srcBytes[rowIndex * srcWidth * 2 + colIndex * 2 + 1];
+                    final int byte10 = srcBytes[(rowIndex * 2 + 1) * srcWidth + colIndex * 2];
+                    final int byte11 = srcBytes[(rowIndex * 2 + 1) * srcWidth + colIndex * 2 + 1];
 
-        for (int rowIndex = 0; rowIndex < dstHeight; rowIndex++) {
-            for (int colIndex = 0; colIndex < dstWidth; colIndex++) {
-                final int byte00 = srcBytes[rowIndex * srcWidth * 2 + colIndex * 2];
-                final int byte01 = srcBytes[rowIndex * srcWidth * 2 + colIndex * 2 + 1];
-                final int byte10 = srcBytes[(rowIndex * 2 + 1) * srcWidth + colIndex * 2];
-                final int byte11 = srcBytes[(rowIndex * 2 + 1) * srcWidth + colIndex * 2 + 1];
+                    final byte dstByte = (byte) Math.min(Math.min(byte00, byte01), Math.min(byte10, byte11));
 
-                final byte dstByte = (byte) Math.min(Math.min(byte00, byte01), Math.min(byte10, byte11));
-
-                dstBytes[rowIndex * dstWidth + colIndex] = dstByte;
+                    dstBytes[rowIndex * dstWidth + colIndex] = dstByte;
+                }
             }
+            return new ImageBytes(dstWidth, dstHeight, dstBytes, null, srcImageBytes.getImageFormat());
         }
-        return new ImageBytes(dstWidth, dstHeight, dstBytes);
+        if (srcImageBytes.getPixels() != null) {
+            final int[] srcPixels = srcImageBytes.getPixels();
+            int[] dstPixels = new int[dstWidth * dstHeight];
+
+            for (int rowIndex = 0; rowIndex < dstHeight; rowIndex++) {
+                for (int colIndex = 0; colIndex < dstWidth; colIndex++) {
+                    final int pixel00 = srcPixels[rowIndex * srcWidth * 2 + colIndex * 2];
+                    final int pixel01 = srcPixels[rowIndex * srcWidth * 2 + colIndex * 2 + 1];
+                    final int pixel10 = srcPixels[(rowIndex * 2 + 1) * srcWidth + colIndex * 2];
+                    final int pixel11 = srcPixels[(rowIndex * 2 + 1) * srcWidth + colIndex * 2 + 1];
+
+                    final int dstByte = Math.min(Math.min(pixel00, pixel01), Math.min(pixel10, pixel11));
+
+                    dstPixels[rowIndex * dstWidth + colIndex] = dstByte;
+                }
+            }
+            return new ImageBytes(dstWidth, dstHeight, null, dstPixels, srcImageBytes.getImageFormat());
+        }
+        return srcImageBytes;
     }
 
     private ImageBytes rotateImageBytes(ImageBytes srcBytes, int angle) {
@@ -1374,35 +1405,111 @@ class Camera
     private ImageBytes rotateImageBytes90(ImageBytes srcImageBytes, boolean isClockWise) {
         final int srcHeight = srcImageBytes.getHeight();
         final int srcWidth = srcImageBytes.getWidth();
-        final byte[] srcBytes = srcImageBytes.getBytes();
-        final byte[] dstBytes = new byte[srcBytes.length];
 
-        for (int srcRowIndex = 0; srcRowIndex < srcHeight; srcRowIndex++) {
-            for (int srcColIndex = 0; srcColIndex < srcWidth; srcColIndex++) {
-                final byte curByte = srcBytes[srcRowIndex * srcWidth + srcColIndex];
-                if (isClockWise) {
-                    dstBytes[srcHeight - srcRowIndex - 1 + srcColIndex * srcHeight] = curByte;
-                } else {
-                    dstBytes[srcRowIndex + (srcWidth - srcColIndex - 1) * srcHeight] = curByte;
+        if (srcImageBytes.getBytes() != null) {
+            final byte[] srcBytes = srcImageBytes.getBytes();
+            final byte[] dstBytes = new byte[srcBytes.length];
+
+            for (int srcRowIndex = 0; srcRowIndex < srcHeight; srcRowIndex++) {
+                for (int srcColIndex = 0; srcColIndex < srcWidth; srcColIndex++) {
+                    final byte curByte = srcBytes[srcRowIndex * srcWidth + srcColIndex];
+                    if (isClockWise) {
+                        dstBytes[srcHeight - srcRowIndex - 1 + srcColIndex * srcHeight] = curByte;
+                    } else {
+                        dstBytes[srcRowIndex + (srcWidth - srcColIndex - 1) * srcHeight] = curByte;
+                    }
                 }
             }
+            return new ImageBytes(srcHeight, srcWidth, dstBytes, null, srcImageBytes.getImageFormat());
         }
-        return new ImageBytes(srcHeight, srcWidth, dstBytes);
+
+        if (srcImageBytes.getPixels() != null) {
+            final int[] srcPixels = srcImageBytes.getPixels();
+            final int[] dstPixels = new int[srcPixels.length];
+
+            for (int srcRowIndex = 0; srcRowIndex < srcHeight; srcRowIndex++) {
+                for (int srcColIndex = 0; srcColIndex < srcWidth; srcColIndex++) {
+                    final int curPixel = srcPixels[srcRowIndex * srcWidth + srcColIndex];
+                    if (isClockWise) {
+                        dstPixels[srcHeight - srcRowIndex - 1 + srcColIndex * srcHeight] = curPixel;
+                    } else {
+                        dstPixels[srcRowIndex + (srcWidth - srcColIndex - 1) * srcHeight] = curPixel;
+                    }
+                }
+            }
+            return new ImageBytes(srcHeight, srcWidth, null, dstPixels, srcImageBytes.getImageFormat());
+        }
+
+        return srcImageBytes;
     }
 
     private ImageBytes rotateImageBytes180(ImageBytes srcImageBytes) {
         final int srcHeight = srcImageBytes.getHeight();
         final int srcWidth = srcImageBytes.getWidth();
-        final byte[] srcBytes = srcImageBytes.getBytes();
-        final byte[] dstBytes = new byte[srcBytes.length];
+        if (srcImageBytes.getBytes() != null) {
+            final byte[] srcBytes = srcImageBytes.getBytes();
+            final byte[] dstBytes = new byte[srcBytes.length];
 
-        for (int srcRowIndex = 0; srcRowIndex < srcHeight; srcRowIndex++) {
-            for (int srcColIndex = 0; srcColIndex < srcWidth; srcColIndex++) {
-                final byte curByte = srcBytes[srcRowIndex * srcWidth + srcColIndex];
-                dstBytes[(srcHeight - srcRowIndex) * srcWidth - srcColIndex - 1] = curByte;
+            for (int srcRowIndex = 0; srcRowIndex < srcHeight; srcRowIndex++) {
+                for (int srcColIndex = 0; srcColIndex < srcWidth; srcColIndex++) {
+                    final byte curByte = srcBytes[srcRowIndex * srcWidth + srcColIndex];
+                    dstBytes[(srcHeight - srcRowIndex) * srcWidth - srcColIndex - 1] = curByte;
+                }
             }
+            return new ImageBytes(srcWidth, srcHeight, dstBytes, null, srcImageBytes.getImageFormat());
         }
-        return new ImageBytes(srcWidth, srcHeight, dstBytes);
+        if (srcImageBytes.getPixels() != null) {
+            final int[] srcPixels = srcImageBytes.getPixels();
+            final int[] dstPixels = new int[srcPixels.length];
+
+            for (int srcRowIndex = 0; srcRowIndex < srcHeight; srcRowIndex++) {
+                for (int srcColIndex = 0; srcColIndex < srcWidth; srcColIndex++) {
+                    final int curPixel = srcPixels[srcRowIndex * srcWidth + srcColIndex];
+                    dstPixels[(srcHeight - srcRowIndex) * srcWidth - srcColIndex - 1] = curPixel;
+                }
+            }
+            return new ImageBytes(srcWidth, srcHeight, null, dstPixels, srcImageBytes.getImageFormat());
+        }
+        return srcImageBytes;
+    }
+
+    private ImageBytes getBytesFromImage(Image image) {
+        try {
+            if (image.getFormat() == ImageFormat.JPEG) {
+                return getBytesFromJpegImage(image);
+            } else if (image.getFormat() == ImageFormat.YUV_420_888) {
+                return removeStridesFromImage(image);
+            }
+            return null;
+        } catch (Exception exception) {
+            Log.e(TAG, "Barcode getBytesFromImage exception", exception);
+            final CameraBarcode cameraBarcode = new CameraBarcode(
+                    null,
+                    null,
+                    exception.toString());
+            sendCameraBarcodeEvent(cameraBarcode);
+            return null;
+        }
+    }
+
+    @NonNull
+    private ImageBytes getBytesFromJpegImage(Image image) {
+        Image.Plane[] planes = image.getPlanes();
+        ByteBuffer buffer = planes[0].getBuffer();
+        byte[] data = new byte[buffer.capacity()];
+        buffer.get(data);
+        final Bitmap srcBitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+        final int width = srcBitmap.getWidth();
+        final int height = srcBitmap.getHeight();
+        final int[] pixels = new int[width * height];
+        srcBitmap.getPixels(pixels, 0, width, 0, 0, width, height);
+        srcBitmap.recycle();
+        return new ImageBytes(
+                width,
+                height,
+                null,
+                pixels,
+                ImageFormat.JPEG);
     }
 
     private ImageBytes removeStridesFromImage(Image image) {
@@ -1442,7 +1549,7 @@ class Camera
                 buffer.position(buffer.position() + rowStride - length);
             }
         }
-        return new ImageBytes(width, height, data);
+        return new ImageBytes(width, height, data, null, ImageFormat.YUV_420_888);
     }
 
     private ImageBytes cropImageBytes(ImageBytes srcImageBytes,
@@ -1472,19 +1579,38 @@ class Camera
         final int dstWidth = srcWidth - leftOffset - rightOffset;
         final int dstHeight = srcHeight - topOffset - bottomOffset;
 
-        final byte[] srcBytes = srcImageBytes.getBytes();
-        final byte[] dstBytes = new byte[dstWidth * dstHeight];
+        if (srcImageBytes.getBytes() != null) {
+            final byte[] srcBytes = srcImageBytes.getBytes();
+            final byte[] dstBytes = new byte[dstWidth * dstHeight];
 
-        for (int rowIndex = topOffset; rowIndex < topOffset + dstHeight; rowIndex++) {
-            System.arraycopy(
-                    srcBytes,
-                    rowIndex * srcWidth + leftOffset,
-                    dstBytes,
-                    (rowIndex - topOffset) * dstWidth,
-                    dstWidth
-            );
+            for (int rowIndex = topOffset; rowIndex < topOffset + dstHeight; rowIndex++) {
+                System.arraycopy(
+                        srcBytes,
+                        rowIndex * srcWidth + leftOffset,
+                        dstBytes,
+                        (rowIndex - topOffset) * dstWidth,
+                        dstWidth
+                );
+            }
+            return new ImageBytes(dstWidth, dstHeight, dstBytes, null, srcImageBytes.getImageFormat());
         }
-        return new ImageBytes(dstWidth, dstHeight, dstBytes);
+
+        if (srcImageBytes.getPixels() != null) {
+            final int[] srcPixels = srcImageBytes.getPixels();
+            final int[] dstPixels = new int[dstWidth * dstHeight];
+
+            for (int rowIndex = topOffset; rowIndex < topOffset + dstHeight; rowIndex++) {
+                System.arraycopy(
+                        srcPixels,
+                        rowIndex * srcWidth + leftOffset,
+                        dstPixels,
+                        (rowIndex - topOffset) * dstWidth,
+                        dstWidth
+                );
+            }
+            return new ImageBytes(dstWidth, dstHeight, null, dstPixels, srcImageBytes.getImageFormat());
+        }
+        return srcImageBytes;
     }
 
     private void closeCaptureSession() {

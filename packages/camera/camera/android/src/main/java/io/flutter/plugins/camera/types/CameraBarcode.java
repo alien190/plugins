@@ -16,8 +16,8 @@ public class CameraBarcode {
     public HashMap<String, Object> getMap() {
         return new HashMap<String, Object>() {
             {
-                put("text", text);
-                put("format", format);
+                put("text", text != null ? text : "");
+                put("format", format != null ? format : "");
                 put("errorDescription", errorDescription);
             }
         };
