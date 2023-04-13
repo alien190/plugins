@@ -58,13 +58,15 @@ public class CameraFeatureFactoryImpl implements CameraFeatureFactory {
             ResolutionPreset initialSetting,
             String cameraName,
             int longSideSize,
-            int imageQuality) {
+            int imageQuality,
+            @NonNull DartMessenger messenger) {
         return new ResolutionFeature(
                 cameraProperties,
                 initialSetting,
                 cameraName,
                 longSideSize,
-                imageQuality);
+                imageQuality,
+                messenger);
     }
 
     @Override

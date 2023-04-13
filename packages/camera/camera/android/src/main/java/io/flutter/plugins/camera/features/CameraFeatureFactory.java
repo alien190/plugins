@@ -76,6 +76,7 @@ public interface CameraFeatureFactory {
      * @param cameraName       the name of the camera which can be used to identify the camera device.
      * @param longSideSize     the target size of longest side of an image
      * @param imageQuality     the JPEG quality of a result image in range of 0-100
+     * @param messenger        the messenger to send log to flutter side
      * @return newly created instance of the ResolutionFeature class.
      */
     ResolutionFeature createResolutionFeature(
@@ -83,7 +84,8 @@ public interface CameraFeatureFactory {
             ResolutionPreset initialSetting,
             String cameraName,
             int longSideSize,
-            int imageQuality);
+            int imageQuality,
+            @NonNull DartMessenger messenger);
 
     /**
      * Creates a new instance of the focus point feature.

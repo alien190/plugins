@@ -77,7 +77,8 @@ public class CameraFeatures {
                         resolutionPreset,
                         cameraProperties.getCameraName(),
                         longSideSize,
-                        imageQuality));
+                        imageQuality,
+                        dartMessenger));
         cameraFeatures.setZoomLevel(cameraFeatureFactory.createZoomLevelFeature(cameraProperties));
         return cameraFeatures;
     }
