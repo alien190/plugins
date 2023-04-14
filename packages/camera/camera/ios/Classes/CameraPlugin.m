@@ -461,6 +461,7 @@ AVCaptureAudioDataOutputSampleBufferDelegate>
 @property(assign, atomic) int barcodeCropTop;
 @property(assign, atomic) int barcodeCropBottom;
 @property(readonly, nonatomic) ZXMultiFormatReader *barcodeReader;
+@property(readonly, nonatomic) ZXDecodeHints *barcodeHints;
 @property(nonatomic) FlutterEventChannel *barcodeEventChannel;
 @property(nonatomic) BarcodeStreamHandler *barcodeStreamHandler;
 @end
@@ -717,6 +718,12 @@ NSString *const errorMethod = @"error";
 
 - (void)start {
     if(_isBarcodeStreamEnabled) {
+        _barcodeHints = [ZXDecodeHints hints];
+        [_barcodeHints addPossibleFormat:kBarcodeFormatEan8];
+        [_barcodeHints addPossibleFormat:kBarcodeFormatEan13];
+        [_barcodeHints addPossibleFormat:kBarcodeFormatRSSExpanded];
+        [_barcodeHints addPossibleFormat:kBarcodeFormatRSS14];
+
         _barcodeReader = [ZXMultiFormatReader reader];
         _isNextFrameToBarcodeScanRequired = true;
         
@@ -1188,20 +1195,14 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 
 - (void)recognizeBarcode:(ZXLuminanceSource*)source {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        if(self->_barcodeReader != nil && self->_barcodeStreamHandler != nil && self->_barcodeStreamHandler.eventSink != nil) {
+        if(self->_barcodeReader != nil && self->_barcodeHints != nil && self->_barcodeStreamHandler != nil && self->_barcodeStreamHandler.eventSink != nil) {
             
             ZXBinaryBitmap *bitmap = [ZXBinaryBitmap binaryBitmapWithBinarizer:[ZXHybridBinarizer binarizerWithSource:source]];
             
             NSError *error = nil;
-            
-            ZXDecodeHints* barcodeHints = [ZXDecodeHints hints];
-            [barcodeHints addPossibleFormat:kBarcodeFormatEan8];
-            [barcodeHints addPossibleFormat:kBarcodeFormatEan13];
-            [barcodeHints addPossibleFormat:kBarcodeFormatRSSExpanded];
-            [barcodeHints addPossibleFormat:kBarcodeFormatRSS14];
-            
+
             ZXResult *result = [self->_barcodeReader decode:bitmap
-                                                      hints:barcodeHints
+                                                      hints:self->_barcodeHints
                                                       error:&error];
             if (result) {
                 NSMutableDictionary* dict = [NSMutableDictionary dictionary];
