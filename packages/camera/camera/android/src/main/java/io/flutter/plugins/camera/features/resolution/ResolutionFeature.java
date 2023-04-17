@@ -11,9 +11,11 @@ import android.media.CamcorderProfile;
 import android.util.Log;
 import android.util.Size;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
 import io.flutter.plugins.camera.CameraProperties;
+import io.flutter.plugins.camera.DartMessenger;
 import io.flutter.plugins.camera.features.CameraFeature;
 
 import java.util.ArrayList;
@@ -40,6 +42,8 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
     private final int shortSideSize;
     private final int imageQuality;
 
+    private final DartMessenger messenger;
+
     /**
      * Creates a new instance of the {@link ResolutionFeature}.
      *
@@ -52,13 +56,15 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
             ResolutionPreset resolutionPreset,
             String cameraName,
             int longSideSize,
-            int imageQuality
+            int imageQuality,
+            @NonNull DartMessenger messenger
     ) {
         super(cameraProperties);
         this.currentSetting = resolutionPreset;
         this.longSideSize = longSideSize > 0 ? longSideSize : 1600;
         this.shortSideSize = (int) ((float) this.longSideSize / 1.333333333f);
         this.imageQuality = imageQuality >= 0 && imageQuality <= 100 ? imageQuality : 100;
+        this.messenger = messenger;
         try {
             this.cameraId = Integer.parseInt(cameraName, 10);
         } catch (NumberFormatException e) {
@@ -235,7 +241,7 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
             }
         }
         if (selectedOutputFormats.isEmpty()) {
-            Log.i(TAG, "There isn't any sizes for JPEG or YUV_420_888 format");
+            logInfo("There isn't any sizes for JPEG or YUV_420_888 format");
             return;
         }
 
@@ -243,14 +249,14 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
         try {
             jpegClosestSize = getClosest43Resolution(streamConfigurationMap, ImageFormat.JPEG);
         } catch (IllegalStateException exception) {
-            Log.i(TAG, "There isn't any closest sizes for JPEG format");
+            logInfo("There isn't any closest sizes for JPEG format");
         }
 
         Size yuvClosestSize = null;
         try {
             yuvClosestSize = getClosest43Resolution(streamConfigurationMap, ImageFormat.YUV_420_888);
         } catch (IllegalStateException exception) {
-            Log.i(TAG, "There isn't any closest sizes for YUV_420_888 format");
+            logInfo("There isn't any closest sizes for YUV_420_888 format");
         }
 
         if (jpegClosestSize != null && yuvClosestSize != null) {
@@ -260,7 +266,7 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
                 final Size size = new Size(longSideSize, shortSideSize);
                 previewSize = size;
                 captureSize = size;
-                Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
+                logInfo("Camera was configured for size: " + size + ", format: " + captureFormat);
                 return;
             }
 
@@ -270,7 +276,7 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
                 final Size size = new Size(longSideSize, shortSideSize);
                 previewSize = size;
                 captureSize = size;
-                Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
+                logInfo("Camera was configured for size: " + size + ", format: " + captureFormat);
                 return;
             }
 
@@ -280,7 +286,7 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
                 final Size size = new Size(yuvClosestSize.getWidth(), yuvClosestSize.getHeight());
                 previewSize = size;
                 captureSize = size;
-                Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
+                logInfo("Camera was configured for size: " + size + ", format: " + captureFormat);
                 return;
             }
 
@@ -288,28 +294,28 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
             final Size size = new Size(jpegClosestSize.getWidth(), jpegClosestSize.getHeight());
             previewSize = size;
             captureSize = size;
-            Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
+            logInfo("Camera was configured for size: " + size + ", format: " + captureFormat);
 
         } else if (jpegClosestSize != null) {
             captureFormat = ImageFormat.JPEG;
             final Size size = new Size(jpegClosestSize.getWidth(), jpegClosestSize.getHeight());
             previewSize = size;
             captureSize = size;
-            Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
+            logInfo("Camera was configured for size: " + size + ", format: " + captureFormat);
 
         } else if (yuvClosestSize != null) {
             captureFormat = ImageFormat.YUV_420_888;
             final Size size = new Size(yuvClosestSize.getWidth(), yuvClosestSize.getHeight());
             previewSize = size;
             captureSize = size;
-            Log.w(TAG, "Camera was configured for size: " + size + ", format: " + captureFormat);
+            logInfo("Camera was configured for size: " + size + ", format: " + captureFormat);
         }
     }
 
     private Size getClosest43Resolution(StreamConfigurationMap streamConfigurationMap, int format)
             throws IllegalStateException {
         final Size[] sizes = streamConfigurationMap.getOutputSizes(format);
-        Log.w(TAG, "Available sizes, format: " + format + ", sizes: " + Arrays.toString(sizes));
+        logInfo("Available sizes, format: " + format + ", sizes: " + Arrays.toString(sizes));
         Arrays.sort(sizes, (o1, o2) ->
                 {
                     final int widthDiff = o1.getWidth() - o2.getWidth();
@@ -338,18 +344,23 @@ public class ResolutionFeature extends CameraFeature<ResolutionPreset> {
                     aspectRatio <= ResolutionPreset.PREFFERED_43FORMAT_HIGH_ASPECT_RATIO) {
                 lastAppropriateAspectRatioSize = size;
                 if (longSide >= longSideSize) {
-                    Log.w(TAG, "Selected size: " + size + ", format: " + format);
+                    logInfo("Selected size: " + size + ", format: " + format);
                     return size;
                 }
             }
         }
 
         if (lastAppropriateAspectRatioSize != null) {
-            Log.w(TAG, "Selected last appropriate size: " + lastAppropriateAspectRatioSize + ", format: " + format);
+            logInfo("Selected last appropriate size: " + lastAppropriateAspectRatioSize + ", format: " + format);
             return lastAppropriateAspectRatioSize;
         }
-        Log.w(TAG, "Size selection: No appropriate size");
+        logInfo("Size selection: No appropriate size");
         throw new IllegalStateException("No sizes");
+    }
+
+    private void logInfo(String text) {
+        messenger.sendDeviceLogInfoMessageEvent(text);
+        Log.i(TAG, text);
     }
 
     public int getLongSideSize() {

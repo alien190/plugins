@@ -14,6 +14,7 @@ import android.media.CamcorderProfile;
 import android.media.EncoderProfiles;
 
 import io.flutter.plugins.camera.CameraProperties;
+import io.flutter.plugins.camera.DartMessenger;
 
 import java.util.List;
 
@@ -128,8 +129,9 @@ public class ResolutionFeatureTest {
     @Test
     public void getDebugName_shouldReturnTheNameOfTheFeature() {
         CameraProperties mockCameraProperties = mock(CameraProperties.class);
+        DartMessenger dartMessenger = mock(DartMessenger.class);
         ResolutionFeature resolutionFeature =
-                new ResolutionFeature(mockCameraProperties, ResolutionPreset.max, cameraName, longSideSize, imageQuality);
+                new ResolutionFeature(mockCameraProperties, ResolutionPreset.max, cameraName, longSideSize, imageQuality, dartMessenger);
 
         assertEquals("ResolutionFeature", resolutionFeature.getDebugName());
     }
@@ -137,8 +139,9 @@ public class ResolutionFeatureTest {
     @Test
     public void getValue_shouldReturnInitialValueWhenNotSet() {
         CameraProperties mockCameraProperties = mock(CameraProperties.class);
+        DartMessenger dartMessenger = mock(DartMessenger.class);
         ResolutionFeature resolutionFeature =
-                new ResolutionFeature(mockCameraProperties, ResolutionPreset.max, cameraName, longSideSize, imageQuality);
+                new ResolutionFeature(mockCameraProperties, ResolutionPreset.max, cameraName, longSideSize, imageQuality, dartMessenger);
 
         assertEquals(ResolutionPreset.max, resolutionFeature.getValue());
     }
@@ -146,8 +149,9 @@ public class ResolutionFeatureTest {
     @Test
     public void getValue_shouldEchoSetValue() {
         CameraProperties mockCameraProperties = mock(CameraProperties.class);
+        DartMessenger dartMessenger = mock(DartMessenger.class);
         ResolutionFeature resolutionFeature =
-                new ResolutionFeature(mockCameraProperties, ResolutionPreset.max, cameraName, longSideSize, imageQuality);
+                new ResolutionFeature(mockCameraProperties, ResolutionPreset.max, cameraName, longSideSize, imageQuality, dartMessenger);
 
         resolutionFeature.setValue(ResolutionPreset.high);
 
@@ -157,8 +161,9 @@ public class ResolutionFeatureTest {
     @Test
     public void checkIsSupport_returnsTrue() {
         CameraProperties mockCameraProperties = mock(CameraProperties.class);
+        DartMessenger dartMessenger = mock(DartMessenger.class);
         ResolutionFeature resolutionFeature =
-                new ResolutionFeature(mockCameraProperties, ResolutionPreset.max, cameraName, longSideSize, imageQuality);
+                new ResolutionFeature(mockCameraProperties, ResolutionPreset.max, cameraName, longSideSize, imageQuality, dartMessenger);
 
         assertTrue(resolutionFeature.checkIsSupported());
     }

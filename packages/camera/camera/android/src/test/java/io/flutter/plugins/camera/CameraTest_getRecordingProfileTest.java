@@ -86,8 +86,9 @@ public class CameraTest_getRecordingProfileTest {
     @Config(maxSdk = 30)
     @Test
     public void getRecordingProfileLegacy() {
+        DartMessenger dartMessenger = mock(DartMessenger.class);
         ResolutionFeature mockResolutionFeature =
-                mockCameraFeatureFactory.createResolutionFeature(mockCameraProperties, null, null, longSideSize, imageQuality;
+                mockCameraFeatureFactory.createResolutionFeature(mockCameraProperties, null, null, longSideSize, imageQuality, dartMessenger);
         CamcorderProfile mockCamcorderProfile = mock(CamcorderProfile.class);
 
         when(mockResolutionFeature.getRecordingProfileLegacy()).thenReturn(mockCamcorderProfile);
@@ -154,7 +155,8 @@ public class CameraTest_getRecordingProfileTest {
                 ResolutionPreset initialSetting,
                 String cameraName,
                 int longSideSize,
-                int imageQuality) {
+                int imageQuality,
+                @NonNull DartMessenger messenger) {
             return mockResolutionFeature;
         }
 

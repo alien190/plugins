@@ -271,7 +271,7 @@ class Camera
                         .build();
     }
 
-    @SuppressLint("MissingPermission")
+    @SuppressLint({"MissingPermission", "WrongConstant"})
     public void open(String imageFormatGroup,
                      BarcodeCaptureSettings barcodeCaptureSettings,
                      EventChannel barcodeEventChannel
@@ -1247,7 +1247,7 @@ class Camera
                     final ImageBytes bytes = getBytesFromImage(img);
                     img.close();
 
-                    if (bytes == null) return;
+                    if (bytes == null || barcodeBackgroundHandler == null) return;
 
                     barcodeBackgroundHandler.post(() -> {
                         try {
@@ -1376,9 +1376,9 @@ class Camera
                     final int pixel10 = srcPixels[(rowIndex * 2 + 1) * srcWidth + colIndex * 2];
                     final int pixel11 = srcPixels[(rowIndex * 2 + 1) * srcWidth + colIndex * 2 + 1];
 
-                    final int dstByte = Math.min(Math.min(pixel00, pixel01), Math.min(pixel10, pixel11));
+                    // final int dstByte = Math.min(Math.min(pixel00, pixel01), Math.min(pixel10, pixel11));
 
-                    dstPixels[rowIndex * dstWidth + colIndex] = dstByte;
+                    dstPixels[rowIndex * dstWidth + colIndex] = pixel00;
                 }
             }
             return new ImageBytes(dstWidth, dstHeight, null, dstPixels, srcImageBytes.getImageFormat());
@@ -1498,7 +1498,19 @@ class Camera
         ByteBuffer buffer = planes[0].getBuffer();
         byte[] data = new byte[buffer.capacity()];
         buffer.get(data);
-        final Bitmap srcBitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(data, 0, data.length, options);
+        if (options.mCancel || options.outWidth == -1 || options.outHeight == -1) {
+            throw new Error("JPEG conversation error, options is " + options);
+        }
+        options.inSampleSize = 1;
+        options.inJustDecodeBounds = false;
+
+        options.inDither = false;
+        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+        final Bitmap srcBitmap = BitmapFactory.decodeByteArray(data, 0, data.length, options);
         final int width = srcBitmap.getWidth();
         final int height = srcBitmap.getHeight();
         final int[] pixels = new int[width * height];

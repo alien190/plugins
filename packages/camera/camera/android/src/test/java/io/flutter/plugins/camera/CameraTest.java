@@ -138,6 +138,7 @@ public class CameraTest {
         final boolean enableAudio = false;
         final int longSideSize = 1600;
         final int imageQuality = 100;
+        final DartMessenger dartMessenger = mock(DartMessenger.class);
 
         when(mockCameraProperties.getCameraName()).thenReturn(cameraName);
         SensorOrientationFeature mockSensorOrientationFeature = mock(SensorOrientationFeature.class);
@@ -170,7 +171,7 @@ public class CameraTest {
         verify(mockCameraFeatureFactory, times(1)).createFpsRangeFeature(mockCameraProperties);
         verify(mockCameraFeatureFactory, times(1)).createNoiseReductionFeature(mockCameraProperties);
         verify(mockCameraFeatureFactory, times(1))
-                .createResolutionFeature(mockCameraProperties, resolutionPreset, cameraName, longSideSize, imageQuality);
+                .createResolutionFeature(mockCameraProperties, resolutionPreset, cameraName, longSideSize, imageQuality, dartMessenger);
         verify(mockCameraFeatureFactory, times(1)).createZoomLevelFeature(mockCameraProperties);
         assertNotNull("should create a camera", camera);
     }
@@ -869,7 +870,8 @@ public class CameraTest {
                 ResolutionPreset initialSetting,
                 String cameraName,
                 int longSideSize,
-                int imageQuality) {
+                int imageQuality,
+                @NonNull DartMessenger messenger) {
             return mockResolutionFeature;
         }
 
