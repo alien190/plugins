@@ -10,6 +10,7 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:share/share.dart';
 import 'package:video_player/video_player.dart';
 
@@ -307,15 +308,6 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
               icon: Icon(enableAudio ? Icons.volume_up : Icons.volume_mute),
               color: Colors.blue,
               onPressed: controller != null ? onAudioModeButtonPressed : null,
-            ),
-            IconButton(
-              icon: Icon(controller?.value.isCaptureOrientationLocked ?? false
-                  ? Icons.screen_lock_rotation
-                  : Icons.screen_rotation),
-              color: Colors.blue,
-              onPressed: controller != null
-                  ? onCaptureOrientationLockButtonPressed
-                  : null,
             ),
           ],
         ),
@@ -711,6 +703,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
       imageFormatGroup: ImageFormatGroup.jpeg,
       longSideSize: longSideSize,
       imageQuality: imageQuality,
+      lockedCaptureOrientation: DeviceOrientation.portraitUp,
     );
 
     controller = cameraController;
@@ -730,18 +723,19 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     });
 
     try {
-      cameraController.barcodeStream
-          .then(
-            (stream) => stream.listen(
-              (event) {
-                print('Barcode event: $event');
-              },
-            ),
-          )
-          .ignore();
+      // uncomment to listen to a barcode stream
+      // cameraController.barcodeStream
+      //     .then(
+      //       (stream) => stream.listen(
+      //         (event) {
+      //           print('Barcode event: $event');
+      //         },
+      //       ),
+      //     )
+      //     .ignore();
 
       await cameraController.initialize(
-        isBarcodeStreamEnabled: true,
+        isBarcodeStreamEnabled: false,
         cropTopPercent: 30,
         cropBottomPercent: 30,
       );
@@ -821,24 +815,6 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     enableAudio = !enableAudio;
     if (controller != null) {
       onNewCameraSelected(controller!.description);
-    }
-  }
-
-  void onCaptureOrientationLockButtonPressed() async {
-    try {
-      if (controller != null) {
-        final CameraController cameraController = controller!;
-        if (cameraController.value.isCaptureOrientationLocked) {
-          await cameraController.unlockCaptureOrientation();
-          showInSnackBar('Capture orientation unlocked');
-        } else {
-          await cameraController.lockCaptureOrientation();
-          showInSnackBar(
-              'Capture orientation locked to ${cameraController.value.lockedCaptureOrientation.toString().split('.').last}');
-        }
-      }
-    } on CameraException catch (e) {
-      _showCameraException(e);
     }
   }
 

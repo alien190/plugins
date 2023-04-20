@@ -6,6 +6,7 @@ package io.flutter.plugins.camera.features;
 
 import android.app.Activity;
 
+import io.flutter.embedding.engine.systemchannels.PlatformChannel;
 import io.flutter.plugins.camera.CameraProperties;
 import io.flutter.plugins.camera.DartMessenger;
 import io.flutter.plugins.camera.features.autofocus.AutoFocusFeature;
@@ -50,7 +51,8 @@ public class CameraFeatures {
             DartMessenger dartMessenger,
             ResolutionPreset resolutionPreset,
             final int longSideSize,
-            final int imageQuality) {
+            final int imageQuality,
+            PlatformChannel.DeviceOrientation lockedCaptureOrientation) {
         CameraFeatures cameraFeatures = new CameraFeatures();
         cameraFeatures.setAutoFocus(
                 cameraFeatureFactory.createAutoFocusFeature(cameraProperties, false));
@@ -60,7 +62,7 @@ public class CameraFeatures {
                 cameraFeatureFactory.createExposureOffsetFeature(cameraProperties));
         SensorOrientationFeature sensorOrientationFeature =
                 cameraFeatureFactory.createSensorOrientationFeature(
-                        cameraProperties, activity, dartMessenger);
+                        cameraProperties, activity, dartMessenger, lockedCaptureOrientation);
         cameraFeatures.setSensorOrientation(sensorOrientationFeature);
         cameraFeatures.setExposurePoint(
                 cameraFeatureFactory.createExposurePointFeature(

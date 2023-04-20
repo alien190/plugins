@@ -8,6 +8,7 @@ import android.app.Activity;
 
 import androidx.annotation.NonNull;
 
+import io.flutter.embedding.engine.systemchannels.PlatformChannel;
 import io.flutter.plugins.camera.CameraProperties;
 import io.flutter.plugins.camera.DartMessenger;
 import io.flutter.plugins.camera.features.autofocus.AutoFocusFeature;
@@ -122,7 +123,8 @@ public interface CameraFeatureFactory {
     SensorOrientationFeature createSensorOrientationFeature(
             @NonNull CameraProperties cameraProperties,
             @NonNull Activity activity,
-            @NonNull DartMessenger dartMessenger);
+            @NonNull DartMessenger dartMessenger,
+            PlatformChannel.DeviceOrientation lockedCaptureOrientation);
 
     /**
      * Creates a new instance of the zoom level feature.

@@ -8,6 +8,7 @@ import android.app.Activity;
 
 import androidx.annotation.NonNull;
 
+import io.flutter.embedding.engine.systemchannels.PlatformChannel;
 import io.flutter.plugins.camera.CameraProperties;
 import io.flutter.plugins.camera.DartMessenger;
 import io.flutter.plugins.camera.features.autofocus.AutoFocusFeature;
@@ -85,8 +86,9 @@ public class CameraFeatureFactoryImpl implements CameraFeatureFactory {
     public SensorOrientationFeature createSensorOrientationFeature(
             @NonNull CameraProperties cameraProperties,
             @NonNull Activity activity,
-            @NonNull DartMessenger dartMessenger) {
-        return new SensorOrientationFeature(cameraProperties, activity, dartMessenger);
+            @NonNull DartMessenger dartMessenger,
+            PlatformChannel.DeviceOrientation lockedCaptureOrientation) {
+        return new SensorOrientationFeature(cameraProperties, activity, dartMessenger, lockedCaptureOrientation);
     }
 
     @Override

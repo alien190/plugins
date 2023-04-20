@@ -39,7 +39,6 @@ public class DeviceOrientationManager implements SensorEventListener {
             new IntentFilter(Intent.ACTION_CONFIGURATION_CHANGED);
 
     private static final String TAG = "DeviceOrientationMng";
-    private static final double verticalTiltPrecision = 0.5;
 
     private final Activity activity;
     private final DartMessenger messenger;
@@ -60,7 +59,7 @@ public class DeviceOrientationManager implements SensorEventListener {
     private boolean isVerticalTiltAvailable = false;
     private TakePictureMode takePictureMode = TakePictureMode.unknownShot;
     private double targetImageRotation = 0;
-    private PlatformChannel.DeviceOrientation lockedCaptureOrientation = null;
+    private final PlatformChannel.DeviceOrientation lockedCaptureOrientation;
     private int lockedCaptureAngle = -1;
     private int deviceOrientationAngle = 0;
 
@@ -74,18 +73,24 @@ public class DeviceOrientationManager implements SensorEventListener {
     public static DeviceOrientationManager create(
             @NonNull Activity activity,
             @NonNull DartMessenger messenger,
+            PlatformChannel.DeviceOrientation lockedCaptureOrientation,
             boolean isFrontFacing) {
-        return new DeviceOrientationManager(activity, messenger, isFrontFacing);
+        return new DeviceOrientationManager(activity, messenger, lockedCaptureOrientation, isFrontFacing);
     }
 
     private DeviceOrientationManager(
             @NonNull Activity activity,
             @NonNull DartMessenger messenger,
+            PlatformChannel.DeviceOrientation lockedCaptureOrientation,
             boolean isFrontFacing) {
         this.activity = activity;
         this.messenger = messenger;
         this.isFrontFacing = isFrontFacing;
         this.sensorManager = (SensorManager) activity.getSystemService(Context.SENSOR_SERVICE);
+        this.lockedCaptureOrientation = lockedCaptureOrientation;
+        lockedCaptureAngle = lockedCaptureOrientation != null
+                ? getOrientationAngle(lockedCaptureOrientation)
+                : -1;
         orientationAngles[0] = 0;
         orientationAngles[1] = 1.54f;
         orientationAngles[2] = 1.54f;
@@ -510,22 +515,6 @@ public class DeviceOrientationManager implements SensorEventListener {
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int i) {
-    }
-
-    public void lockCaptureOrientation(PlatformChannel.DeviceOrientation orientation) {
-        this.lockedCaptureOrientation = orientation;
-        this.lockedCaptureAngle = getOrientationAngle(lockedCaptureOrientation);
-        sendDeviceTiltsChangeEvent();
-    }
-
-    /**
-     * Unlock the capture orientation, indicating that the device orientation should be used to
-     * configure the capture orientation.
-     */
-    public void unlockCaptureOrientation() {
-        this.lockedCaptureOrientation = null;
-        lockedCaptureAngle = -1;
-        sendDeviceTiltsChangeEvent();
     }
 
     public DeviceTilts getDeviceTilts() {

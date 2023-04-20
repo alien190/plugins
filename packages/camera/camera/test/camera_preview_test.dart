@@ -178,6 +178,9 @@ class FakeController extends ValueNotifier<CameraValue>
   @override
   Future<Stream<CameraBarcode>> get barcodeStream =>
       Future.value(Stream.fromIterable([]));
+
+  @override
+  DeviceOrientation? get lockedCaptureOrientation => null;
 }
 
 void main() {

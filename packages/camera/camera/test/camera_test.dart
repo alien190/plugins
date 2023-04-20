@@ -1277,106 +1277,6 @@ void main() {
             'This is a test error message',
           )));
     });
-
-    test('lockCaptureOrientation() calls $CameraPlatform', () async {
-      CameraController cameraController = CameraController(
-          CameraDescription(
-              name: 'cam',
-              lensDirection: CameraLensDirection.back,
-              sensorOrientation: 90),
-          ResolutionPreset.max);
-      await cameraController.initialize();
-
-      await cameraController.lockCaptureOrientation();
-      expect(cameraController.value.lockedCaptureOrientation,
-          equals(DeviceOrientation.portraitUp));
-      await cameraController
-          .lockCaptureOrientation(DeviceOrientation.landscapeRight);
-      expect(cameraController.value.lockedCaptureOrientation,
-          equals(DeviceOrientation.landscapeRight));
-
-      verify(CameraPlatform.instance.lockCaptureOrientation(
-              cameraController.cameraId, DeviceOrientation.portraitUp))
-          .called(1);
-      verify(CameraPlatform.instance.lockCaptureOrientation(
-              cameraController.cameraId, DeviceOrientation.landscapeRight))
-          .called(1);
-    });
-
-    test(
-        'lockCaptureOrientation() throws $CameraException on $PlatformException',
-        () async {
-      CameraController cameraController = CameraController(
-          CameraDescription(
-              name: 'cam',
-              lensDirection: CameraLensDirection.back,
-              sensorOrientation: 90),
-          ResolutionPreset.max);
-      await cameraController.initialize();
-      when(CameraPlatform.instance.lockCaptureOrientation(
-              cameraController.cameraId, DeviceOrientation.portraitUp))
-          .thenThrow(
-        PlatformException(
-          code: 'TEST_ERROR',
-          message: 'This is a test error message',
-          details: null,
-        ),
-      );
-
-      expect(
-          cameraController.lockCaptureOrientation(DeviceOrientation.portraitUp),
-          throwsA(isA<CameraException>().having(
-            (error) => error.description,
-            'TEST_ERROR',
-            'This is a test error message',
-          )));
-    });
-
-    test('unlockCaptureOrientation() calls $CameraPlatform', () async {
-      CameraController cameraController = CameraController(
-          CameraDescription(
-              name: 'cam',
-              lensDirection: CameraLensDirection.back,
-              sensorOrientation: 90),
-          ResolutionPreset.max);
-      await cameraController.initialize();
-
-      await cameraController.unlockCaptureOrientation();
-      expect(cameraController.value.lockedCaptureOrientation, equals(null));
-
-      verify(CameraPlatform.instance
-              .unlockCaptureOrientation(cameraController.cameraId))
-          .called(1);
-    });
-
-    test(
-        'unlockCaptureOrientation() throws $CameraException on $PlatformException',
-        () async {
-      CameraController cameraController = CameraController(
-          CameraDescription(
-              name: 'cam',
-              lensDirection: CameraLensDirection.back,
-              sensorOrientation: 90),
-          ResolutionPreset.max);
-      await cameraController.initialize();
-      when(CameraPlatform.instance
-              .unlockCaptureOrientation(cameraController.cameraId))
-          .thenThrow(
-        PlatformException(
-          code: 'TEST_ERROR',
-          message: 'This is a test error message',
-          details: null,
-        ),
-      );
-
-      expect(
-          cameraController.unlockCaptureOrientation(),
-          throwsA(isA<CameraException>().having(
-            (error) => error.description,
-            'TEST_ERROR',
-            'This is a test error message',
-          )));
-    });
   });
 }
 
@@ -1413,13 +1313,12 @@ class MockCameraPlatform extends Mock
       Future.value(mockAvailableCameras);
 
   @override
-  Future<int> createCamera(
-    CameraDescription description,
-    ResolutionPreset? resolutionPreset, {
-    bool enableAudio = false,
-    int longSideSize = 1600,
-    int imageQuality = 100,
-  }) =>
+  Future<int> createCamera(CameraDescription cameraDescription,
+          ResolutionPreset? resolutionPreset,
+          {bool enableAudio = false,
+          int longSideSize = 1600,
+          int imageQuality = 100,
+          DeviceOrientation? lockedCaptureOrientation}) =>
       mockPlatformException
           ? throw PlatformException(code: 'foo', message: 'bar')
           : Future.value(mockInitializeCamera);

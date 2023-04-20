@@ -87,9 +87,7 @@ import io.flutter.view.TextureRegistry.SurfaceTextureEntry;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -194,7 +192,8 @@ class Camera
             final ResolutionPreset resolutionPreset,
             final boolean enableAudio,
             final int longSideSize,
-            final int imageQuality) {
+            final int imageQuality,
+            PlatformChannel.DeviceOrientation lockedCaptureOrientation) {
 
         if (activity == null) {
             throw new IllegalStateException("No activity available!");
@@ -213,7 +212,8 @@ class Camera
                 dartMessenger,
                 resolutionPreset,
                 longSideSize,
-                imageQuality);
+                imageQuality,
+                lockedCaptureOrientation);
 
         // Create capture callback.
         captureTimeouts = new CaptureTimeoutsWrapper(3000, 3000);
@@ -255,8 +255,7 @@ class Camera
         }
 
         final PlatformChannel.DeviceOrientation lockedOrientation =
-                ((SensorOrientationFeature) cameraFeatures.getSensorOrientation())
-                        .getLockedCaptureOrientation();
+                cameraFeatures.getSensorOrientation().getLockedCaptureOrientation();
 
         MediaRecorderBuilder mediaRecorderBuilder = new MediaRecorderBuilder(getRecordingProfileLegacy(), outputFilePath);
 
@@ -632,16 +631,6 @@ class Camera
 
         // Have all features update the builder.
         updateBuilderSettings(stillBuilder);
-
-        // Orientation.
-        final PlatformChannel.DeviceOrientation lockedOrientation =
-                ((SensorOrientationFeature) cameraFeatures.getSensorOrientation())
-                        .getLockedCaptureOrientation();
-//        stillBuilder.set(
-//                CaptureRequest.JPEG_ORIENTATION,
-//                lockedOrientation == null
-//                        ? getDeviceOrientationManager().getPhotoOrientation()
-//                        : getDeviceOrientationManager().getPhotoOrientation(lockedOrientation));
 
         CameraCaptureSession.CaptureCallback captureCallback =
                 new CameraCaptureSession.CaptureCallback() {
@@ -1118,22 +1107,6 @@ class Camera
         refreshPreviewCaptureSession(
                 () -> result.success(null),
                 (code, message) -> result.error("setZoomLevelFailed", "Could not set zoom level.", null));
-    }
-
-    /**
-     * Lock capture orientation from dart.
-     *
-     * @param orientation new orientation.
-     */
-    public void lockCaptureOrientation(PlatformChannel.DeviceOrientation orientation) {
-        cameraFeatures.getSensorOrientation().lockCaptureOrientation(orientation);
-    }
-
-    /**
-     * Unlock capture orientation from dart.
-     */
-    public void unlockCaptureOrientation() {
-        cameraFeatures.getSensorOrientation().unlockCaptureOrientation();
     }
 
     /**

@@ -57,6 +57,7 @@ abstract class CameraPlatform extends PlatformInterface {
     bool enableAudio = false,
     int longSideSize = 1600,
     int imageQuality = 100,
+    DeviceOrientation? lockedCaptureOrientation,
   }) {
     throw UnimplementedError('createCamera() is not implemented.');
   }
@@ -129,17 +130,6 @@ abstract class CameraPlatform extends PlatformInterface {
   /// The device info event.
   Stream<DeviceLogInfoMessageEvent> onDeviceLogInfo() {
     throw UnimplementedError('onDeviceLogInfo() is not implemented.');
-  }
-
-  /// Locks the capture orientation.
-  Future<void> lockCaptureOrientation(
-      int cameraId, DeviceOrientation orientation) {
-    throw UnimplementedError('lockCaptureOrientation() is not implemented.');
-  }
-
-  /// Unlocks the capture orientation.
-  Future<void> unlockCaptureOrientation(int cameraId) {
-    throw UnimplementedError('unlockCaptureOrientation() is not implemented.');
   }
 
   /// Captures an image and returns the file where it was saved.

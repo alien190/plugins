@@ -107,7 +107,8 @@ public class CameraTest {
                         resolutionPreset,
                         enableAudio,
                         longSideSize,
-                        imageQuality);
+                        imageQuality,
+                        null);
 
         TestUtils.setPrivateField(camera, "captureSession", mockCaptureSession);
         TestUtils.setPrivateField(camera, "previewRequestBuilder", mockPreviewRequestBuilder);
@@ -142,7 +143,7 @@ public class CameraTest {
 
         when(mockCameraProperties.getCameraName()).thenReturn(cameraName);
         SensorOrientationFeature mockSensorOrientationFeature = mock(SensorOrientationFeature.class);
-        when(mockCameraFeatureFactory.createSensorOrientationFeature(any(), any(), any()))
+        when(mockCameraFeatureFactory.createSensorOrientationFeature(any(), any(), any(), any()))
                 .thenReturn(mockSensorOrientationFeature);
 
         Camera camera =
@@ -155,11 +156,12 @@ public class CameraTest {
                         resolutionPreset,
                         enableAudio,
                         longSideSize,
-                        imageQuality
+                        imageQuality,
+                        null
                 );
 
         verify(mockCameraFeatureFactory, times(1))
-                .createSensorOrientationFeature(mockCameraProperties, mockActivity, mockDartMessenger);
+                .createSensorOrientationFeature(mockCameraProperties, mockActivity, mockDartMessenger, null);
         verify(mockCameraFeatureFactory, times(1)).createAutoFocusFeature(mockCameraProperties, false);
         verify(mockCameraFeatureFactory, times(1)).createExposureLockFeature(mockCameraProperties);
         verify(mockCameraFeatureFactory, times(1))
@@ -179,7 +181,7 @@ public class CameraTest {
     @Test
     public void getDeviceOrientationManager() {
         SensorOrientationFeature mockSensorOrientationFeature =
-                mockCameraFeatureFactory.createSensorOrientationFeature(mockCameraProperties, null, null);
+                mockCameraFeatureFactory.createSensorOrientationFeature(mockCameraProperties, null, null, null);
         DeviceOrientationManager mockDeviceOrientationManager = mock(DeviceOrientationManager.class);
 
         when(mockSensorOrientationFeature.getDeviceOrientationManager())
@@ -746,30 +748,7 @@ public class CameraTest {
                 .error("setExposureOffsetFailed", "Could not set exposure offset.", null);
     }
 
-    @Test
-    public void lockCaptureOrientation_shouldLockCaptureOrientation() {
-        final Activity mockActivity = mock(Activity.class);
-        SensorOrientationFeature mockSensorOrientationFeature =
-                mockCameraFeatureFactory.createSensorOrientationFeature(
-                        mockCameraProperties, mockActivity, mockDartMessenger);
 
-        camera.lockCaptureOrientation(PlatformChannel.DeviceOrientation.PORTRAIT_UP);
-
-        verify(mockSensorOrientationFeature, times(1))
-                .lockCaptureOrientation(PlatformChannel.DeviceOrientation.PORTRAIT_UP);
-    }
-
-    @Test
-    public void unlockCaptureOrientation_shouldUnlockCaptureOrientation() {
-        final Activity mockActivity = mock(Activity.class);
-        SensorOrientationFeature mockSensorOrientationFeature =
-                mockCameraFeatureFactory.createSensorOrientationFeature(
-                        mockCameraProperties, mockActivity, mockDartMessenger);
-
-        camera.unlockCaptureOrientation();
-
-        verify(mockSensorOrientationFeature, times(1)).unlockCaptureOrientation();
-    }
 
     @Test
     public void pausePreview_shouldPausePreview() throws CameraAccessException {
@@ -891,7 +870,8 @@ public class CameraTest {
         public SensorOrientationFeature createSensorOrientationFeature(
                 @NonNull CameraProperties cameraProperties,
                 @NonNull Activity activity,
-                @NonNull DartMessenger dartMessenger) {
+                @NonNull DartMessenger dartMessenger,
+                PlatformChannel.DeviceOrientation orientation) {
             return mockSensorOrientationFeature;
         }
 

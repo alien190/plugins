@@ -317,27 +317,6 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
                 }
                 break;
             }
-            case "lockCaptureOrientation": {
-                PlatformChannel.DeviceOrientation orientation =
-                        CameraUtils.deserializeDeviceOrientation(call.argument("orientation"));
-
-                try {
-                    camera.lockCaptureOrientation(orientation);
-                    result.success(null);
-                } catch (Exception e) {
-                    handleException(e, result);
-                }
-                break;
-            }
-            case "unlockCaptureOrientation": {
-                try {
-                    camera.unlockCaptureOrientation();
-                    result.success(null);
-                } catch (Exception e) {
-                    handleException(e, result);
-                }
-                break;
-            }
             case "pausePreview": {
                 try {
                     camera.pausePreview();
@@ -412,6 +391,9 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
         boolean enableAudio = call.hasArgument("enableAudio") ? call.argument("enableAudio") : false;
         int longSideSize = call.hasArgument("longSideSize") ? call.argument("longSideSize") : 1600;
         int imageQuality = call.hasArgument("imageQuality") ? call.argument("imageQuality") : 100;
+        String lockedCaptureOrientationStr = call.argument("lockedCaptureOrientation");
+        PlatformChannel.DeviceOrientation lockedCaptureOrientation = lockedCaptureOrientationStr != null ?
+                CameraUtils.deserializeDeviceOrientation(lockedCaptureOrientationStr) : null;
 
         TextureRegistry.SurfaceTextureEntry flutterSurfaceTexture =
                 textureRegistry.createSurfaceTexture();
@@ -432,7 +414,8 @@ final class MethodCallHandlerImpl implements MethodChannel.MethodCallHandler {
                         resolutionPreset,
                         enableAudio,
                         longSideSize,
-                        imageQuality);
+                        imageQuality,
+                        lockedCaptureOrientation);
 
         Map<String, Object> reply = new HashMap<>();
         reply.put("cameraId", flutterSurfaceTexture.id());

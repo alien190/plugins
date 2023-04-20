@@ -27,9 +27,6 @@ apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 android {
     compileSdkVersion 33
 
-    lintOptions {
-        disable 'InvalidPackage'
-    }
 
     defaultConfig {
         applicationId "io.flutter.plugins.cameraexample"
@@ -52,6 +49,10 @@ android {
     }
 
     ndkVersion '21.1.6352462'
+    lint {
+        disable 'InvalidPackage'
+    }
+    namespace 'io.flutter.plugins.cameraexample'
 }
 
 flutter {

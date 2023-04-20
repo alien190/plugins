@@ -19,6 +19,7 @@ import android.os.HandlerThread;
 
 import androidx.annotation.NonNull;
 
+import io.flutter.embedding.engine.systemchannels.PlatformChannel;
 import io.flutter.plugins.camera.features.CameraFeatureFactory;
 import io.flutter.plugins.camera.features.autofocus.AutoFocusFeature;
 import io.flutter.plugins.camera.features.exposurelock.ExposureLockFeature;
@@ -80,7 +81,8 @@ public class CameraTest_getRecordingProfileTest {
                         resolutionPreset,
                         enableAudio,
                         longSideSize,
-                        imageQuality);
+                        imageQuality,
+                        null);
     }
 
     @Config(maxSdk = 30)
@@ -176,7 +178,8 @@ public class CameraTest_getRecordingProfileTest {
         public SensorOrientationFeature createSensorOrientationFeature(
                 @NonNull CameraProperties cameraProperties,
                 @NonNull Activity activity,
-                @NonNull DartMessenger dartMessenger) {
+                @NonNull DartMessenger dartMessenger,
+                PlatformChannel.DeviceOrientation orientation) {
             return mockSensorOrientationFeature;
         }
 

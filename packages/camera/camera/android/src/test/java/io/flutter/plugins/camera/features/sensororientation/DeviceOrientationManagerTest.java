@@ -47,7 +47,7 @@ public class DeviceOrientationManagerTest {
     when(mockWindowManager.getDefaultDisplay()).thenReturn(mockDisplay);
 
     deviceOrientationManager =
-        DeviceOrientationManager.create(mockActivity, mockDartMessenger, false, 0);
+        DeviceOrientationManager.create(mockActivity, mockDartMessenger, null,false);
   }
 
   @Test
@@ -70,7 +70,7 @@ public class DeviceOrientationManagerTest {
   @Test
   public void getVideoOrientation_whenNaturalScreenOrientationEqualsLandscapeLeft() {
     DeviceOrientationManager orientationManager =
-        DeviceOrientationManager.create(mockActivity, mockDartMessenger, false, 90);
+        DeviceOrientationManager.create(mockActivity, mockDartMessenger, null, false);
 
     int degreesPortraitUp = orientationManager.getVideoOrientation(DeviceOrientation.PORTRAIT_UP);
     int degreesPortraitDown =
@@ -95,47 +95,13 @@ public class DeviceOrientationManagerTest {
     assertEquals(90, degrees);
   }
 
-  @Test
-  public void getPhotoOrientation_whenNaturalScreenOrientationEqualsPortraitUp() {
-    int degreesPortraitUp =
-        deviceOrientationManager.getPhotoOrientation(DeviceOrientation.PORTRAIT_UP);
-    int degreesPortraitDown =
-        deviceOrientationManager.getPhotoOrientation(DeviceOrientation.PORTRAIT_DOWN);
-    int degreesLandscapeLeft =
-        deviceOrientationManager.getPhotoOrientation(DeviceOrientation.LANDSCAPE_LEFT);
-    int degreesLandscapeRight =
-        deviceOrientationManager.getPhotoOrientation(DeviceOrientation.LANDSCAPE_RIGHT);
 
-    assertEquals(0, degreesPortraitUp);
-    assertEquals(90, degreesLandscapeRight);
-    assertEquals(180, degreesPortraitDown);
-    assertEquals(270, degreesLandscapeLeft);
-  }
-
-  @Test
-  public void getPhotoOrientation_whenNaturalScreenOrientationEqualsLandscapeLeft() {
-    DeviceOrientationManager orientationManager =
-        DeviceOrientationManager.create(mockActivity, mockDartMessenger, false, 90);
-
-    int degreesPortraitUp = orientationManager.getPhotoOrientation(DeviceOrientation.PORTRAIT_UP);
-    int degreesPortraitDown =
-        orientationManager.getPhotoOrientation(DeviceOrientation.PORTRAIT_DOWN);
-    int degreesLandscapeLeft =
-        orientationManager.getPhotoOrientation(DeviceOrientation.LANDSCAPE_LEFT);
-    int degreesLandscapeRight =
-        orientationManager.getPhotoOrientation(DeviceOrientation.LANDSCAPE_RIGHT);
-
-    assertEquals(90, degreesPortraitUp);
-    assertEquals(180, degreesLandscapeRight);
-    assertEquals(270, degreesPortraitDown);
-    assertEquals(0, degreesLandscapeLeft);
-  }
 
   @Test
   public void getPhotoOrientation_shouldFallbackToCurrentOrientationWhenOrientationIsNull() {
     setUpUIOrientationMocks(Configuration.ORIENTATION_LANDSCAPE, Surface.ROTATION_0);
 
-    int degrees = deviceOrientationManager.getPhotoOrientation(null);
+    int degrees = deviceOrientationManager.getPhotoOrientation();
 
     assertEquals(270, degrees);
   }

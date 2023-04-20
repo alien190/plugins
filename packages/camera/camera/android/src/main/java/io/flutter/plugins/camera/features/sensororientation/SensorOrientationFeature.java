@@ -22,7 +22,7 @@ import io.flutter.plugins.camera.features.resolution.ResolutionFeature;
 public class SensorOrientationFeature extends CameraFeature<Integer> {
     private Integer currentSetting = 0;
     private final DeviceOrientationManager deviceOrientationListener;
-    private PlatformChannel.DeviceOrientation lockedCaptureOrientation;
+    private final PlatformChannel.DeviceOrientation lockedCaptureOrientation;
 
     /**
      * Creates a new instance of the {@link ResolutionFeature}.
@@ -36,13 +36,16 @@ public class SensorOrientationFeature extends CameraFeature<Integer> {
     public SensorOrientationFeature(
             @NonNull CameraProperties cameraProperties,
             @NonNull Activity activity,
-            @NonNull DartMessenger dartMessenger) {
+            @NonNull DartMessenger dartMessenger,
+            PlatformChannel.DeviceOrientation lockedCaptureOrientation) {
         super(cameraProperties);
+        this.lockedCaptureOrientation = lockedCaptureOrientation;
+
         setValue(cameraProperties.getSensorOrientation());
 
         boolean isFrontFacing = cameraProperties.getLensFacing() == CameraMetadata.LENS_FACING_FRONT;
         deviceOrientationListener =
-                DeviceOrientationManager.create(activity, dartMessenger, isFrontFacing);
+                DeviceOrientationManager.create(activity, dartMessenger, lockedCaptureOrientation, isFrontFacing);
         deviceOrientationListener.start();
     }
 
@@ -78,26 +81,6 @@ public class SensorOrientationFeature extends CameraFeature<Integer> {
      */
     public DeviceOrientationManager getDeviceOrientationManager() {
         return this.deviceOrientationListener;
-    }
-
-    /**
-     * Lock the capture orientation, indicating that the device orientation should not influence the
-     * capture orientation.
-     *
-     * @param orientation The orientation in which to lock the capture orientation.
-     */
-    public void lockCaptureOrientation(PlatformChannel.DeviceOrientation orientation) {
-        this.lockedCaptureOrientation = orientation;
-        deviceOrientationListener.lockCaptureOrientation(orientation);
-    }
-
-    /**
-     * Unlock the capture orientation, indicating that the device orientation should be used to
-     * configure the capture orientation.
-     */
-    public void unlockCaptureOrientation() {
-        this.lockedCaptureOrientation = null;
-        deviceOrientationListener.unlockCaptureOrientation();
     }
 
     /**

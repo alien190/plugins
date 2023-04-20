@@ -85,6 +85,7 @@ class MethodChannelCamera extends CameraPlatform {
     bool enableAudio = false,
     int longSideSize = 1600,
     int imageQuality = 100,
+    DeviceOrientation? lockedCaptureOrientation,
   }) async {
     try {
       final reply = await _channel
@@ -96,6 +97,9 @@ class MethodChannelCamera extends CameraPlatform {
         'enableAudio': enableAudio,
         'longSideSize': longSideSize,
         'imageQuality': imageQuality,
+        if (lockedCaptureOrientation != null)
+          'lockedCaptureOrientation':
+              serializeDeviceOrientation(lockedCaptureOrientation),
       });
 
       return reply!['cameraId'];
@@ -214,28 +218,6 @@ class MethodChannelCamera extends CameraPlatform {
   Stream<DeviceLogInfoMessageEvent> onDeviceLogInfo() {
     return deviceEventStreamController.stream
         .whereType<DeviceLogInfoMessageEvent>();
-  }
-
-  @override
-  Future<void> lockCaptureOrientation(
-    int cameraId,
-    DeviceOrientation orientation,
-  ) async {
-    await _channel.invokeMethod<String>(
-      'lockCaptureOrientation',
-      <String, dynamic>{
-        'cameraId': cameraId,
-        'orientation': serializeDeviceOrientation(orientation)
-      },
-    );
-  }
-
-  @override
-  Future<void> unlockCaptureOrientation(int cameraId) async {
-    await _channel.invokeMethod<String>(
-      'unlockCaptureOrientation',
-      <String, dynamic>{'cameraId': cameraId},
-    );
   }
 
   @override

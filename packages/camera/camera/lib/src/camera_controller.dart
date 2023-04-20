@@ -238,6 +238,7 @@ class CameraController extends ValueNotifier<CameraValue> {
     this.imageFormatGroup,
     this.longSideSize = 1600,
     this.imageQuality = 100,
+    this.lockedCaptureOrientation,
   }) : super(const CameraValue.uninitialized());
 
   /// The properties of the camera device controlled by this controller.
@@ -264,6 +265,9 @@ class CameraController extends ValueNotifier<CameraValue> {
 
   /// The quality of a result JPEG image in range 0-100
   final int imageQuality;
+
+  /// The locked capture orientation
+  final DeviceOrientation? lockedCaptureOrientation;
 
   /// The id of a camera that hasn't been initialized.
   @visibleForTesting
@@ -351,6 +355,7 @@ class CameraController extends ValueNotifier<CameraValue> {
         enableAudio: enableAudio,
         longSideSize: 1600,
         imageQuality: imageQuality,
+        lockedCaptureOrientation: lockedCaptureOrientation,
       );
 
       unawaited(CameraPlatform.instance
@@ -375,22 +380,23 @@ class CameraController extends ValueNotifier<CameraValue> {
       );
 
       value = value.copyWith(
-        isInitialized: true,
-        previewSize: await _initializeCompleter.future
-            .then((CameraInitializedEvent event) => Size(
-                  event.previewWidth,
-                  event.previewHeight,
-                )),
-        exposureMode: await _initializeCompleter.future
-            .then((event) => event.exposureMode),
-        focusMode:
-            await _initializeCompleter.future.then((event) => event.focusMode),
-        exposurePointSupported: await _initializeCompleter.future
-            .then((event) => event.exposurePointSupported),
-        focusPointSupported: await _initializeCompleter.future
-            .then((event) => event.focusPointSupported),
-        isStreamingBarcodes: isBarcodeStreamEnabled,
-      );
+          isInitialized: true,
+          previewSize: await _initializeCompleter.future
+              .then((CameraInitializedEvent event) => Size(
+                    event.previewWidth,
+                    event.previewHeight,
+                  )),
+          exposureMode: await _initializeCompleter.future
+              .then((event) => event.exposureMode),
+          focusMode: await _initializeCompleter.future
+              .then((event) => event.focusMode),
+          exposurePointSupported: await _initializeCompleter.future
+              .then((event) => event.exposurePointSupported),
+          focusPointSupported: await _initializeCompleter.future
+              .then((event) => event.focusPointSupported),
+          isStreamingBarcodes: isBarcodeStreamEnabled,
+          lockedCaptureOrientation:
+              Optional.fromNullable(lockedCaptureOrientation));
 
       _cameraClosingSubscription =
           CameraPlatform.instance.onCameraClosing(cameraId).listen(
@@ -910,36 +916,11 @@ class CameraController extends ValueNotifier<CameraValue> {
     }
   }
 
-  /// Locks the capture orientation.
-  ///
-  /// If [orientation] is omitted, the current device orientation is used.
-  Future<void> lockCaptureOrientation([DeviceOrientation? orientation]) async {
-    try {
-      await CameraPlatform.instance.lockCaptureOrientation(
-          _cameraId, orientation ?? value.deviceOrientation);
-      value = value.copyWith(
-          lockedCaptureOrientation:
-              Optional.fromNullable(orientation ?? value.deviceOrientation));
-    } on PlatformException catch (e) {
-      throw CameraException(e.code, e.message);
-    }
-  }
-
   /// Sets the focus mode for taking pictures.
   Future<void> setFocusMode(FocusMode mode) async {
     try {
       await CameraPlatform.instance.setFocusMode(_cameraId, mode);
       value = value.copyWith(focusMode: mode);
-    } on PlatformException catch (e) {
-      throw CameraException(e.code, e.message);
-    }
-  }
-
-  /// Unlocks the capture orientation.
-  Future<void> unlockCaptureOrientation() async {
-    try {
-      await CameraPlatform.instance.unlockCaptureOrientation(_cameraId);
-      value = value.copyWith(lockedCaptureOrientation: Optional.absent());
     } on PlatformException catch (e) {
       throw CameraException(e.code, e.message);
     }
