@@ -58,9 +58,9 @@ public class DeviceOrientationManager implements SensorEventListener {
     private boolean isHorizontalTiltAvailable = false;
     private boolean isVerticalTiltAvailable = false;
     private TakePictureMode takePictureMode = TakePictureMode.unknownShot;
-    private double targetImageRotation = 0;
+    private double targetImageRotation;
     private final PlatformChannel.DeviceOrientation lockedCaptureOrientation;
-    private int lockedCaptureAngle = -1;
+    private final int lockedCaptureAngle;
     private int deviceOrientationAngle = 0;
 
     public int getUIOrientationAngle() {
@@ -241,9 +241,11 @@ public class DeviceOrientationManager implements SensorEventListener {
                     public void onReceive(Context context, Intent intent) {
                         PlatformChannel.DeviceOrientation orientation = getUIOrientation();
                         if (!orientation.equals(uiOrientation) && isOrientationChangeAllowed()) {
-                            Log.d(TAG, "UI orientation set:" + orientation.toString());
                             uiOrientation = orientation;
                             messenger.sendDeviceOrientationChangeEvent(uiOrientation);
+                            final String message = "UI orientation set:" + orientation;
+                            Log.d(TAG, message);
+                            messenger.sendDeviceLogInfoMessageEvent(message);
                         }
                     }
                 };
