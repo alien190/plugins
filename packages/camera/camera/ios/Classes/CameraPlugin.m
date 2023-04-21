@@ -484,7 +484,8 @@ NSString *const errorMethod = @"error";
                        orientation:(UIDeviceOrientation)orientation
                      dispatchQueue:(dispatch_queue_t)dispatchQueue
                              error:(NSError **)error
-          deviceEventMethodChannel:(FlutterMethodChannel *)deviceEventMethodChannel {
+          deviceEventMethodChannel:(FlutterMethodChannel *)deviceEventMethodChannel
+        lockedCaptureOrientationStr:(NSString *)lockedCaptureOrientationStr {
     self = [super init];
     NSAssert(self, @"super init cannot be nil");
     @try {
@@ -511,6 +512,19 @@ NSString *const errorMethod = @"error";
     _barcodeCropLeft = 0;
     _barcodeCropRight = 0;
     _barcodeCropBottom = 0;
+    
+    
+    if(lockedCaptureOrientationStr) {
+        @try{
+            _lockedCaptureOrientation = getUIDeviceOrientationForString(lockedCaptureOrientationStr);
+        }
+        @catch (NSError *e) {
+            _lockedCaptureOrientation = UIDeviceOrientationUnknown;
+        }
+    } else {
+        _lockedCaptureOrientation = UIDeviceOrientationUnknown;
+    }
+    
     
     NSError *localError = nil;
     _captureVideoInput = [AVCaptureDeviceInput deviceInputWithDevice:_captureDevice
@@ -723,7 +737,7 @@ NSString *const errorMethod = @"error";
         [_barcodeHints addPossibleFormat:kBarcodeFormatEan13];
         [_barcodeHints addPossibleFormat:kBarcodeFormatRSSExpanded];
         [_barcodeHints addPossibleFormat:kBarcodeFormatRSS14];
-
+        
         _barcodeReader = [ZXMultiFormatReader reader];
         _isNextFrameToBarcodeScanRequired = true;
         
@@ -1200,7 +1214,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
             ZXBinaryBitmap *bitmap = [ZXBinaryBitmap binaryBitmapWithBinarizer:[ZXHybridBinarizer binarizerWithSource:source]];
             
             NSError *error = nil;
-
+            
             ZXResult *result = [self->_barcodeReader decode:bitmap
                                                       hints:self->_barcodeHints
                                                       error:&error];
@@ -1378,30 +1392,6 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
 
 - (void)resumeVideoRecordingWithResult:(FLTThreadSafeFlutterResult *)result {
     _isRecordingPaused = NO;
-    [result sendSuccess];
-}
-
-- (void)lockCaptureOrientationWithResult:(FLTThreadSafeFlutterResult *)result
-                             orientation:(NSString *)orientationStr {
-    UIDeviceOrientation orientation;
-    @try {
-        orientation = getUIDeviceOrientationForString(orientationStr);
-    } @catch (NSError *e) {
-        [result sendError:e];
-        return;
-    }
-    
-    if (_lockedCaptureOrientation != orientation) {
-        _lockedCaptureOrientation = orientation;
-        [self updateOrientation];
-    }
-    
-    [result sendSuccess];
-}
-
-- (void)unlockCaptureOrientationWithResult:(FLTThreadSafeFlutterResult *)result {
-    _lockedCaptureOrientation = UIDeviceOrientationUnknown;
-    [self updateOrientation];
     [result sendSuccess];
 }
 
@@ -1947,6 +1937,7 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
             NSError *error;
             NSNumber* longSideSize = call.arguments[@"longSideSize"];
             NSNumber* imageQuality = call.arguments[@"imageQuality"];
+            NSString* lockedCaptureOrientationStr = call.arguments[@"lockedCaptureOrientation"];
             
             
             FLTCam *cam = [[FLTCam alloc] initWithCameraName:cameraName
@@ -1957,7 +1948,8 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
                                                  orientation:[[UIDevice currentDevice] orientation]
                                                dispatchQueue:self->_dispatchQueue
                                                        error:&error
-                                    deviceEventMethodChannel:self->_deviceEventMethodChannel];
+                                    deviceEventMethodChannel:self->_deviceEventMethodChannel
+                                  lockedCaptureOrientationStr:lockedCaptureOrientationStr];
             if (error) {
                 [result sendError:error];
             } else {
@@ -2116,10 +2108,6 @@ didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
         } else if ([@"setExposureOffset" isEqualToString:call.method]) {
             [_camera setExposureOffsetWithResult:result
                                           offset:((NSNumber *)call.arguments[@"offset"]).doubleValue];
-        } else if ([@"lockCaptureOrientation" isEqualToString:call.method]) {
-            [_camera lockCaptureOrientationWithResult:result orientation:call.arguments[@"orientation"]];
-        } else if ([@"unlockCaptureOrientation" isEqualToString:call.method]) {
-            [_camera unlockCaptureOrientationWithResult:result];
         } else if ([@"setFocusMode" isEqualToString:call.method]) {
             [_camera setFocusModeWithResult:result mode:call.arguments[@"mode"]];
         } else if ([@"setFocusPoint" isEqualToString:call.method]) {
