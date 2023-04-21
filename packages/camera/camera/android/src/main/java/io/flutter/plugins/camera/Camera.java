@@ -1475,13 +1475,11 @@ class Camera
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inJustDecodeBounds = true;
         BitmapFactory.decodeByteArray(data, 0, data.length, options);
-        if (options.mCancel || options.outWidth == -1 || options.outHeight == -1) {
+        if (options.outWidth == -1 || options.outHeight == -1) {
             throw new Error("JPEG conversation error, options is " + options);
         }
         options.inSampleSize = 1;
         options.inJustDecodeBounds = false;
-
-        options.inDither = false;
         options.inPreferredConfig = Bitmap.Config.ARGB_8888;
         final Bitmap srcBitmap = BitmapFactory.decodeByteArray(data, 0, data.length, options);
         final int width = srcBitmap.getWidth();
