@@ -537,7 +537,9 @@ class Camera
     }
 
     public void takePicture(@NonNull final Result result) {
-        Log.w(TAG_CAPTURE, "takePicture() invoked");
+        final String message = "takePicture() invoked";
+        dartMessenger.sendDeviceLogInfoMessageEvent(message);
+        Log.w(TAG_CAPTURE, message);
         // Only take one picture at a time.
         if (cameraCaptureCallback.getCameraState() != CameraState.STATE_PREVIEW) {
             result.error("captureAlreadyActive", "Picture is currently already being captured", null);
@@ -1168,30 +1170,39 @@ class Camera
     public void onImageAvailable(ImageReader reader) {
         Log.i(TAG, "onImageAvailable");
         Log.w(TAG_CAPTURE, "onImageAvailable");
+        dartMessenger.sendDeviceLogInfoMessageEvent("Captured image is available");
+        try {
+            final ImageSaver imageSaver = new ImageSaver(
+                    // Use acquireNextImage since image reader is only for one image.
+                    reader.acquireNextImage(),
+                    captureFile,
+                    cameraFeatures.getResolution().getLongSideSize(),
+                    cameraFeatures.getSensorOrientation().getDeviceOrientationManager().getDeviceTilts(),
+                    cameraFeatures.getResolution().getImageQuality(),
+                    cameraFeatures.getSensorOrientation().getValue(),
+                    new ImageSaver.Callback() {
+                        @Override
+                        public void onComplete(TakePictureResult result) {
+                            dartMessenger.sendDeviceLogInfoMessageEvent("ImageSaver.onComplete()");
+                            dartMessenger.finish(flutterResult, result.getMap());
+                            Log.w(TAG_CAPTURE, "ImageSaver.onComplete()");
+                        }
 
-        backgroundHandler.post(
-                new ImageSaver(
-                        // Use acquireNextImage since image reader is only for one image.
-                        reader.acquireNextImage(),
-                        captureFile,
-                        cameraFeatures.getResolution().getLongSideSize(),
-                        cameraFeatures.getSensorOrientation().getDeviceOrientationManager().getDeviceTilts(),
-                        cameraFeatures.getResolution().getImageQuality(),
-                        cameraFeatures.getSensorOrientation().getValue(),
-                        new ImageSaver.Callback() {
-                            @Override
-                            public void onComplete(TakePictureResult result) {
-                                dartMessenger.finish(flutterResult, result.getMap());
-                                Log.w(TAG_CAPTURE, "ImageSaver.onComplete()");
-                            }
-
-                            @Override
-                            public void onError(String errorCode, String errorMessage) {
-                                dartMessenger.error(flutterResult, errorCode, errorMessage, null);
-                                Log.w(TAG_CAPTURE, "ImageSaver.onError()");
-                            }
-                        }));
-        cameraCaptureCallback.setCameraState(CameraState.STATE_PREVIEW);
+                        @Override
+                        public void onError(String errorCode, String errorMessage) {
+                            dartMessenger.sendDeviceLogErrorMessageEvent("ImageSaver.onError(): " + errorMessage);
+                            dartMessenger.error(flutterResult, errorCode, errorMessage, null);
+                            Log.w(TAG_CAPTURE, "ImageSaver.onError()");
+                        }
+                    });
+            backgroundHandler.post(imageSaver);
+            cameraCaptureCallback.setCameraState(CameraState.STATE_PREVIEW);
+        } catch (Exception exception) {
+            final String errorStr = "onImageAvailable error" + exception;
+            Log.e(TAG, errorStr);
+            dartMessenger.sendDeviceLogErrorMessageEvent(errorStr);
+            dartMessenger.error(flutterResult, "error", exception.toString(), null);
+        }
     }
 
     private void setBarcodeStreamAvailableListener(BarcodeCaptureSettings settings) {
